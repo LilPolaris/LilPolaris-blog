@@ -16,6 +16,16 @@ Manual deploy is still available:
 npm run deploy
 ```
 
+This project uses GitHub SSH over port `443` for deploys, which is more stable
+on networks where normal GitHub HTTPS is blocked or reset.
+
+## Site features
+
+- Comments: Utterances, backed by GitHub Issues.
+- Analytics: Busuanzi page/site PV and UV counters are enabled.
+- Code blocks: copy button, language label, Mac-style header, wrapping, and a
+  520px height limit for long snippets.
+
 ## Automatic deploy
 
 The workflow in `.github/workflows/deploy.yml` builds the site on every push to
