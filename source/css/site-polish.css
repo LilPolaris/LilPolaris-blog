@@ -1,0 +1,243 @@
+html[data-theme='light'] {
+  --polaris-bg: #f7fbfc;
+  --polaris-surface: rgba(255, 255, 255, 0.92);
+  --polaris-line: rgba(219, 232, 238, 0.92);
+  --polaris-shadow: rgba(126, 174, 196, 0.12);
+  --polaris-shadow-hover: rgba(126, 174, 196, 0.18);
+  --polaris-main: #7eaec4;
+  --polaris-main-strong: #5f9fb4;
+  --polaris-mint: #9fcfc3;
+  --polaris-text: #2f3a40;
+  --polaris-text-soft: #6f838c;
+}
+
+html[data-theme='light'] body,
+html[data-theme='light'] #body-wrap {
+  background: linear-gradient(180deg, #f9fcfd 0%, #f7fbfc 48%, #f5fbfa 100%);
+  color: var(--polaris-text);
+  font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+html[data-theme='light'] #page-header {
+  background-color: #edf6f8;
+}
+
+html[data-theme='light'] #page-header.full_page {
+  background: linear-gradient(135deg, rgba(126, 174, 196, 0.26), rgba(159, 207, 195, 0.34));
+  background-attachment: scroll;
+}
+
+html[data-theme='light'] #page-header.full_page:not(.not-top-img)::before {
+  background-color: transparent;
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.82), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.65), transparent 24%),
+    linear-gradient(180deg, rgba(247, 251, 252, 0.34), rgba(247, 251, 252, 0.12));
+}
+
+html[data-theme='light'] #page-header.not-top-img #nav,
+html[data-theme='light'] #page-header.nav-fixed #nav,
+html[data-theme='light'] #page-header.fixed #nav {
+  background: rgba(255, 255, 255, 0.78);
+  border-bottom: 1px solid var(--polaris-line);
+  box-shadow: 0 12px 30px var(--polaris-shadow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+html[data-theme='light'] #nav {
+  padding-right: 28px;
+  padding-left: 28px;
+}
+
+html[data-theme='light'] #nav #blog-info,
+html[data-theme='light'] #nav #blog-info .site-name,
+html[data-theme='light'] #nav a,
+html[data-theme='light'] #nav span.site-page,
+html[data-theme='light'] #nav #toggle-menu,
+html[data-theme='light'] #page-header #site-title,
+html[data-theme='light'] #page-header #site-subtitle,
+html[data-theme='light'] #page-header #scroll-down .scroll-down-effects,
+html[data-theme='light'] #page-header #site_social_icons .social-icon {
+  color: var(--polaris-text);
+  text-shadow: none;
+}
+
+html[data-theme='light'] #page-header #site-title,
+html[data-theme='light'] #nav .site-name {
+  font-family: "Avenir Next", "Segoe UI", "PingFang SC", sans-serif;
+  letter-spacing: 0.02em;
+}
+
+html[data-theme='light'] #page-header #site-title {
+  font-weight: 700;
+}
+
+html[data-theme='light'] #page-header #site-subtitle {
+  color: var(--polaris-text-soft);
+}
+
+html[data-theme='light'] #page-header #site_social_icons .social-icon i,
+html[data-theme='light'] .card-info-social-icons .social-icon i {
+  color: var(--polaris-main-strong) !important;
+}
+
+html[data-theme='light'] #nav .menus_item > a,
+html[data-theme='light'] #nav .menus_item > span.site-page,
+html[data-theme='light'] #search-button .search {
+  border-radius: 999px;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+html[data-theme='light'] #nav .menus_item > a:hover,
+html[data-theme='light'] #nav .menus_item > span.site-page:hover,
+html[data-theme='light'] #search-button .search:hover {
+  background: rgba(126, 174, 196, 0.12);
+  color: var(--polaris-main-strong);
+}
+
+html[data-theme='light'] .layout {
+  padding-top: 32px;
+}
+
+html[data-theme='light'] .recent-post-item,
+html[data-theme='light'] .layout > div:first-child:not(.recent-posts),
+html[data-theme='light'] .card-widget {
+  background: var(--polaris-surface);
+  border: 1px solid var(--polaris-line);
+  box-shadow: 0 16px 36px var(--polaris-shadow);
+  border-radius: 22px;
+}
+
+html[data-theme='light'] .recent-post-item:hover,
+html[data-theme='light'] .card-widget:hover,
+html[data-theme='light'] .layout > div:first-child:not(.recent-posts):hover {
+  box-shadow: 0 20px 44px var(--polaris-shadow-hover);
+}
+
+html[data-theme='light'] #recent-posts > .recent-post-item > .recent-post-info {
+  padding: 24px 26px;
+}
+
+html[data-theme='light'] .recent-post-item .article-title,
+html[data-theme='light'] #article-container h1,
+html[data-theme='light'] #article-container h2,
+html[data-theme='light'] #article-container h3,
+html[data-theme='light'] #article-container h4 {
+  color: var(--polaris-text);
+}
+
+html[data-theme='light'] .recent-post-item .content,
+html[data-theme='light'] .article-meta,
+html[data-theme='light'] .article-meta a,
+html[data-theme='light'] .card-info .author-info-description,
+html[data-theme='light'] .webinfo .item-name,
+html[data-theme='light'] #footer,
+html[data-theme='light'] #footer a {
+  color: var(--polaris-text-soft);
+}
+
+html[data-theme='light'] a,
+html[data-theme='light'] #article-container a {
+  color: var(--polaris-main-strong);
+}
+
+html[data-theme='light'] a:hover,
+html[data-theme='light'] #article-container a:hover {
+  color: var(--polaris-main);
+}
+
+html[data-theme='light'] .card-info #card-info-btn,
+html[data-theme='light'] #pagination .page-number.current,
+html[data-theme='light'] #pagination a.extend:hover,
+html[data-theme='light'] #pagination .page-number:hover {
+  background: linear-gradient(135deg, var(--polaris-main), var(--polaris-mint));
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgba(126, 174, 196, 0.22);
+}
+
+html[data-theme='light'] .card-info #card-info-btn {
+  border-radius: 999px;
+}
+
+html[data-theme='light'] .card-tag-cloud a,
+html[data-theme='light'] .card-category-list .card-category-list-link,
+html[data-theme='light'] .card-archive-list-link {
+  color: var(--polaris-text-soft) !important;
+  border-radius: 999px;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+html[data-theme='light'] .card-tag-cloud a:hover,
+html[data-theme='light'] .card-category-list .card-category-list-link:hover,
+html[data-theme='light'] .card-archive-list-link:hover {
+  background: rgba(126, 174, 196, 0.10);
+  color: var(--polaris-main-strong);
+}
+
+html[data-theme='light'] .card-announcement .announcement_content {
+  color: var(--polaris-text);
+}
+
+html[data-theme='light'] .card-announcement .item-headline i,
+html[data-theme='light'] .card-widget .item-headline i {
+  color: var(--polaris-main);
+}
+
+html[data-theme='light'] #rightside button {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--polaris-line);
+  box-shadow: 0 10px 26px rgba(126, 174, 196, 0.14);
+  color: var(--polaris-main-strong);
+}
+
+html[data-theme='light'] #rightside button:hover {
+  background: linear-gradient(135deg, rgba(126, 174, 196, 0.18), rgba(159, 207, 195, 0.20));
+}
+
+html[data-theme='light'] .search-dialog {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--polaris-line);
+  box-shadow: 0 22px 48px rgba(126, 174, 196, 0.20);
+  border-radius: 24px;
+}
+
+html[data-theme='light'] .local-search-input input {
+  border: 1px solid var(--polaris-line);
+  border-radius: 14px;
+  background: rgba(247, 251, 252, 0.88);
+  color: var(--polaris-text);
+}
+
+html[data-theme='light'] #search-mask {
+  background: rgba(126, 174, 196, 0.18);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+html[data-theme='light'] #article-container blockquote {
+  background: #f1f8f9;
+  border-left: 4px solid var(--polaris-main);
+  color: var(--polaris-text);
+}
+
+html[data-theme='light'] #article-container hr {
+  border-color: var(--polaris-line);
+}
+
+html[data-theme='light'] #article-container figure.highlight,
+html[data-theme='light'] #article-container pre {
+  border: 1px solid var(--polaris-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+@media (max-width: 768px) {
+  html[data-theme='light'] #nav {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  html[data-theme='light'] #recent-posts > .recent-post-item > .recent-post-info {
+    padding: 20px 18px;
+  }
+}
