@@ -19,6 +19,51 @@ if (-not (Test-Path -LiteralPath $postFile -PathType Leaf)) {
   throw "Post not found: $postRel"
 }
 
+function Update-PostUpdatedTime {
+  param([string]$Path)
+
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  $text = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
+  $newline = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+  $frontMatterMatch = [regex]::Match($text, "\A---\r?\n(?<front>.*?)\r?\n---", [System.Text.RegularExpressions.RegexOptions]::Singleline)
+
+  if (-not $frontMatterMatch.Success) {
+    return
+  }
+
+  $updated = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+  $front = $frontMatterMatch.Groups["front"].Value
+  $lines = New-Object System.Collections.Generic.List[string]
+  $front -split "\r?\n" | ForEach-Object { $lines.Add($_) }
+
+  $updatedIndex = -1
+  $dateIndex = -1
+
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -match "^updated:\s*") {
+      $updatedIndex = $i
+      break
+    }
+    if ($dateIndex -eq -1 -and $lines[$i] -match "^date:\s*") {
+      $dateIndex = $i
+    }
+  }
+
+  if ($updatedIndex -ge 0) {
+    $lines[$updatedIndex] = "updated: $updated"
+  } elseif ($dateIndex -ge 0) {
+    $lines.Insert($dateIndex + 1, "updated: $updated")
+  } else {
+    $lines.Insert(0, "updated: $updated")
+  }
+
+  $newFront = $lines -join $newline
+  $newText = "---$newline$newFront$newline---" + $text.Substring($frontMatterMatch.Length)
+  [System.IO.File]::WriteAllText($Path, $newText, $utf8NoBom)
+
+  Write-Host "Updated front matter timestamp: $updated"
+}
+
 Push-Location $repoRoot
 try {
   $preStaged = & git -c "safe.directory=$safeDir" diff --cached --name-only
@@ -31,6 +76,8 @@ try {
     $preStaged | ForEach-Object { Write-Host "  $_" }
     throw "Commit or unstage those first, then run this command again."
   }
+
+  Update-PostUpdatedTime $postFile
 
   Write-Host "Building site..."
   & npm run build
