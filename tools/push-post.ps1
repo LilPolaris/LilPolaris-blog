@@ -38,8 +38,11 @@ try {
     throw "Build failed. Fix the error above before publishing."
   }
 
-  & git -c "safe.directory=$safeDir" ls-files --error-unmatch -- $postRel *> $null
-  $isTracked = $LASTEXITCODE -eq 0
+  $trackedFiles = & git -c "safe.directory=$safeDir" ls-files -- $postRel
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to inspect tracked files."
+  }
+  $isTracked = [bool]$trackedFiles
 
   $paths = @($postRel)
   if (Test-Path -LiteralPath $assetDir -PathType Container) {
@@ -58,6 +61,11 @@ try {
   if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Host "No changes to commit for $Post."
+    Write-Host "Pushing any local commits..."
+    & git -c "safe.directory=$safeDir" push
+    if ($LASTEXITCODE -ne 0) {
+      throw "git push failed."
+    }
     return
   }
 
