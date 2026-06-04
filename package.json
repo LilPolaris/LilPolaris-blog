@@ -6,6 +6,9 @@
     "build": "hexo generate",
     "clean": "hexo clean",
     "deploy": "hexo deploy",
+    "images": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/add-post-images.ps1",
+    "new": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/new-post.ps1",
+    "push": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/push-post.ps1",
     "server": "hexo server"
   },
   "hexo": {
