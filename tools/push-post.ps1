@@ -14,9 +14,48 @@ $postFile = Join-Path $repoRoot "source\_posts\$Post.md"
 $assetDir = Join-Path $repoRoot "source\_posts\$Post"
 $postRel = "source/_posts/$Post.md"
 $assetRel = "source/_posts/$Post"
+$paths = @($postRel)
+if (Test-Path -LiteralPath $assetDir -PathType Container) {
+  $paths += $assetRel
+}
 
 if (-not (Test-Path -LiteralPath $postFile -PathType Leaf)) {
   throw "Post not found: $postRel"
+}
+
+function Assert-PostIsReady {
+  param(
+    [string]$Path,
+    [string]$Slug
+  )
+
+  $text = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
+  $frontMatterMatch = [regex]::Match(
+    $text,
+    "\A---\r?\n(?<front>.*?)\r?\n---(?:\r?\n)?",
+    [System.Text.RegularExpressions.RegexOptions]::Singleline
+  )
+
+  if (-not $frontMatterMatch.Success) {
+    throw "Invalid front matter in $postRel. The file must start and end its metadata block with ---."
+  }
+
+  $front = $frontMatterMatch.Groups["front"].Value
+  $titleMatch = [regex]::Match($front, "(?m)^title:\s*(?<title>.*)$")
+  $title = if ($titleMatch.Success) { $titleMatch.Groups["title"].Value.Trim() } else { "" }
+  $body = $text.Substring($frontMatterMatch.Length).Trim()
+
+  if ([string]::IsNullOrWhiteSpace($title)) {
+    throw "The post title is empty. Save a real title in $postRel before publishing."
+  }
+
+  if ($title -eq $Slug) {
+    throw "The post title is still the generated filename '$Slug'. Save the intended title before publishing."
+  }
+
+  if ([string]::IsNullOrWhiteSpace($body)) {
+    throw "The post body is empty on disk. Save the editor file (Ctrl+S) before publishing."
+  }
 }
 
 function Update-PostUpdatedTime {
@@ -77,6 +116,26 @@ try {
     throw "Commit or unstage those first, then run this command again."
   }
 
+  $savedChanges = & git -c "safe.directory=$safeDir" status --porcelain=v1 --untracked-files=all -- $paths
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to inspect saved article changes."
+  }
+
+  if (-not $savedChanges) {
+    $ahead = & git -c "safe.directory=$safeDir" rev-list --count '@{upstream}..HEAD'
+    if ($LASTEXITCODE -eq 0 -and [int]$ahead -gt 0) {
+      Write-Host "No new article changes, but local commits are waiting to be pushed."
+      & git -c "safe.directory=$safeDir" push
+      if ($LASTEXITCODE -ne 0) {
+        throw "git push failed."
+      }
+      return
+    }
+
+    throw "No saved changes found for $postRel. Save the editor file (Ctrl+S), then run this command again."
+  }
+
+  Assert-PostIsReady $postFile $Post
   Update-PostUpdatedTime $postFile
 
   Write-Host "Building site..."
@@ -90,11 +149,6 @@ try {
     throw "Failed to inspect tracked files."
   }
   $isTracked = [bool]$trackedFiles
-
-  $paths = @($postRel)
-  if (Test-Path -LiteralPath $assetDir -PathType Container) {
-    $paths += $assetRel
-  }
 
   Write-Host ""
   Write-Host "Staging:"
