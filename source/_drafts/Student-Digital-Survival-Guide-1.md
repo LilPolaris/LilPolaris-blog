@@ -7,7 +7,8 @@ categories:
   - - 教程
     - 分享
 date: 2026-07-25 16:42:42
-updated: 2026-07-26 20:55:54
+updated: 2026-07-26 21:02:04
+excerpt: 原子文件生成中...
 ---
 由于一些众所周知的缘故，我们在中国大陆内无法访问一些国外网站和服务（如YouTube、ChatGPT、X、Reddit）但是一方面在大学日常生活中我们往往因为**学习原因**需要用到这些网站（如维基百科、Github）另一方面访问“外网”也是帮助自己了解世界的重要途径，所以为了正常访问这些服务，人们通常需要借助代理工具，让自己的网络请求经过其他地区的服务器，再连接目标网站。这个过程在日常交流中经常被称为“科学上网”，更直白的说法则是“翻墙”。
 
@@ -321,3 +322,102 @@ https://gitproxy.mrhjx.cn/https://github.com/clash-verge-rev/clash-verge-rev/rel
 5、注意流量浪费
 请注意，如果你下载steam/epic游戏或者更新系统等大流量下载或更新操作，建议关闭代理，否则极有可能走代理，导致流量的大量浪费。
 建议前往官网，右上角设置，设置每日的流量消费限额。
+6、更多问题
+[详情请见官网](https://www.clashverge.dev/faq/windows.html)
+
+## 常用网站
+看到这里你应该可以访问国际互联网了，如果你不知道看啥，可以先看看下面的网站~
+## 一、搜索与百科
+
+| 网站         | 网址                                                   | 主要用途        |
+| ---------- | ---------------------------------------------------- | ----------- |
+| Google     | [https://www.google.com](https://www.google.com)     | 综合搜索引擎      |
+| 英文维基百科     | [https://en.wikipedia.org](https://en.wikipedia.org) | 查询英文百科资料    |
+| 中文维基百科     | [https://zh.wikipedia.org](https://zh.wikipedia.org) | 查询中文百科资料    |
+| Bing 国际版   | [https://www.bing.com](https://www.bing.com)         | 搜索网页、图片和新闻  |
+| DuckDuckGo | [https://duckduckgo.com](https://duckduckgo.com)     | 强调隐私保护的搜索引擎 |
+
+
+## 二、视频与娱乐
+
+| 网站      | 网址                                                   | 主要用途         |
+| ------- | ---------------------------------------------------- | ------------ |
+| YouTube | [https://www.youtube.com](https://www.youtube.com)   | 视频、课程、纪录片、音乐 |
+| Netflix | [https://www.netflix.com](https://www.netflix.com)   | 影视流媒体        |
+| Twitch  | [https://www.twitch.tv](https://www.twitch.tv)       | 游戏和直播        |
+| Spotify | [https://open.spotify.com](https://open.spotify.com) | 音乐、播客        |
+| IMDb    | [https://www.imdb.com](https://www.imdb.com)         | 电影、电视剧资料与评分  |
+
+
+## 三、学习与科研
+
+| 网站             | 网址                                                                 | 主要用途                |
+| -------------- | ------------------------------------------------------------------ | ------------------- |
+| Google Scholar | [https://scholar.google.com](https://scholar.google.com)           | 搜索论文、专著和引用          |
+| arXiv          | [https://arxiv.org](https://arxiv.org)                             | 阅读人工智能、数学、物理等领域的预印本 |
+| PubMed         | [https://pubmed.ncbi.nlm.nih.gov](https://pubmed.ncbi.nlm.nih.gov) | 检索医学与生命科学论文         |
+| Nature         | [https://www.nature.com](https://www.nature.com)                   | 阅读《自然》及相关学术期刊       |
+| Science        | [https://www.science.org](https://www.science.org)                 | 阅读《科学》及相关内容         |
+| ResearchGate   | [https://www.researchgate.net](https://www.researchgate.net)       | 学术交流、查找作者和论文        |
+| Coursera       | [https://www.coursera.org](https://www.coursera.org)               | 在线大学课程              |
+| edX            | [https://www.edx.org](https://www.edx.org)                         | 高校在线课程              |
+
+
+## 四、编程与软件开发
+
+| 网站             | 网址                                                     | 主要用途          |
+| -------------- | ------------------------------------------------------ | ------------- |
+| GitHub         | [https://github.com](https://github.com)               | 托管代码、参与开源项目   |
+| Stack Overflow | [https://stackoverflow.com](https://stackoverflow.com) | 查询编程问题        |
+| GitLab         | [https://gitlab.com](https://gitlab.com)               | 代码托管和协作开发     |
+| npm            | [https://www.npmjs.com](https://www.npmjs.com)         | JavaScript软件包 |
+| PyPI           | [https://pypi.org](https://pypi.org)                   | Python软件包     |
+| Hugging Face   | [https://huggingface.co](https://huggingface.co)       | 人工智能模型、数据集和演示 |
+
+## 五、社交与社区
+
+| 网站         | 网址                                                     | 主要用途         |
+| ---------- | ------------------------------------------------------ | ------------ |
+| Reddit     | [https://www.reddit.com](https://www.reddit.com)       | 按兴趣划分的论坛社区   |
+| X，原Twitter | [https://x.com](https://x.com)                         | 短消息、新闻和公共讨论  |
+| Facebook   | [https://www.facebook.com](https://www.facebook.com)   | 综合社交网络       |
+| Instagram  | [https://www.instagram.com](https://www.instagram.com) | 图片和短视频社交     |
+| LinkedIn   | [https://www.linkedin.com](https://www.linkedin.com)   | 求职、职业社交和学术履历 |
+| Discord    | [https://discord.com](https://discord.com)             | 群组聊天、游戏和学习社区 |
+| Telegram   | [https://telegram.org](https://telegram.org)           | 即时通信和频道订阅    |
+## 六、国际新闻
+
+| 网站                   | 网址                                                         | 主要用途         |
+| -------------------- | ---------------------------------------------------------- | ------------ |
+| Reuters 路透社          | [https://www.reuters.com](https://www.reuters.com)         | 国际新闻、财经和市场信息 |
+| BBC                  | [https://www.bbc.com](https://www.bbc.com)                 | 国际新闻和专题报道    |
+| Associated Press 美联社 | [https://apnews.com](https://apnews.com)                   | 国际新闻通讯       |
+| The New York Times   | [https://www.nytimes.com](https://www.nytimes.com)         | 新闻、评论和深度报道   |
+| The Guardian         | [https://www.theguardian.com](https://www.theguardian.com) | 英国及国际新闻      |
+| Financial Times      | [https://www.ft.com](https://www.ft.com)                   | 国际财经和商业新闻    |
+| The Economist        | [https://www.economist.com](https://www.economist.com)     | 国际政治、经济和评论   |
+
+## 七、人工智能工具
+
+| 网站                | 网址                                                             | 主要用途           |
+| ----------------- | -------------------------------------------------------------- | -------------- |
+| ChatGPT           | [https://chatgpt.com](https://chatgpt.com)                     | 对话、写作、学习和编程    |
+| Claude            | [https://claude.ai](https://claude.ai)                         | 对话、长文本阅读和写作    |
+| Google Gemini     | [https://gemini.google.com](https://gemini.google.com)         | Google旗下人工智能助手 |
+| Perplexity        | [https://www.perplexity.ai](https://www.perplexity.ai)         | 联网搜索和问答        |
+| Microsoft Copilot | [https://copilot.microsoft.com](https://copilot.microsoft.com) | 搜索、写作和办公辅助     |
+| Hugging Face Chat | [https://huggingface.co/chat](https://huggingface.co/chat)     | 使用开源人工智能模型     |
+## 八、邮箱、网盘与办公
+
+| 网站           | 网址                                                   | 主要用途         |
+| ------------ | ---------------------------------------------------- | ------------ |
+| Gmail        | [https://mail.google.com](https://mail.google.com)   | Google电子邮箱   |
+| Google Drive | [https://drive.google.com](https://drive.google.com) | 云端文件存储与协作    |
+| Google Docs  | [https://docs.google.com](https://docs.google.com)   | 在线文档、表格和演示文稿 |
+| Dropbox      | [https://www.dropbox.com](https://www.dropbox.com)   | 云端存储和文件分享    |
+| Outlook      | [https://outlook.live.com](https://outlook.live.com) | 微软电子邮箱       |
+| Notion       | [https://www.notion.so](https://www.notion.so)       | 笔记、数据库和项目管理  |
+
+对于大学新生，真正最值得优先介绍的可以压缩为十个：
+
+> **Google、Wikipedia、YouTube、Google Scholar、GitHub、Stack Overflow、arXiv、PubMed、Reddit、ChatGPT。**
