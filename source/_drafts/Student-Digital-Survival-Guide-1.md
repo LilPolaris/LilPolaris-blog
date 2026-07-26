@@ -7,7 +7,7 @@ categories:
   - - 教程
     - 分享
 date: 2026-07-25 16:42:42
-updated: 2026-07-26 21:02:48
+updated: 2026-07-26 21:03:38
 excerpt: 原子文件生成中...
 ---
 由于一些众所周知的缘故，我们在中国大陆内无法访问一些国外网站和服务（如YouTube、ChatGPT、X、Reddit）但是一方面在大学日常生活中我们往往因为**学习原因**需要用到这些网站（如维基百科、Github）另一方面访问“外网”也是帮助自己了解世界的重要途径，所以为了正常访问这些服务，人们通常需要借助代理工具，让自己的网络请求经过其他地区的服务器，再连接目标网站。这个过程在日常交流中经常被称为“科学上网”，更直白的说法则是“翻墙”。
@@ -420,4 +420,4 @@ https://gitproxy.mrhjx.cn/https://github.com/clash-verge-rev/clash-verge-rev/rel
 
 对于大学新生，真正最值得优先介绍的可以压缩为十个：
 
-> **Google、Wikipedia、YouTube、Google Scholar、GitHub、Stack Overflow、arXiv、PubMed、Reddit、ChatGPT。**
+> **Google、Wikipedia、YouTube、Google Scholar、GitHub、Pornhub、arXiv、X、Reddit、ChatGPT。**
