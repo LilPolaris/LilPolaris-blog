@@ -7,7 +7,7 @@ categories:
   - - 教程
     - 分享
 date: 2026-07-25 16:42:42
-updated: 2026-07-26 21:02:04
+updated: 2026-07-26 21:02:48
 excerpt: 原子文件生成中...
 ---
 由于一些众所周知的缘故，我们在中国大陆内无法访问一些国外网站和服务（如YouTube、ChatGPT、X、Reddit）但是一方面在大学日常生活中我们往往因为**学习原因**需要用到这些网站（如维基百科、Github）另一方面访问“外网”也是帮助自己了解世界的重要途径，所以为了正常访问这些服务，人们通常需要借助代理工具，让自己的网络请求经过其他地区的服务器，再连接目标网站。这个过程在日常交流中经常被称为“科学上网”，更直白的说法则是“翻墙”。
@@ -327,7 +327,7 @@ https://gitproxy.mrhjx.cn/https://github.com/clash-verge-rev/clash-verge-rev/rel
 
 ## 常用网站
 看到这里你应该可以访问国际互联网了，如果你不知道看啥，可以先看看下面的网站~
-## 一、搜索与百科
+### 一、搜索与百科
 
 | 网站         | 网址                                                   | 主要用途        |
 | ---------- | ---------------------------------------------------- | ----------- |
@@ -338,7 +338,7 @@ https://gitproxy.mrhjx.cn/https://github.com/clash-verge-rev/clash-verge-rev/rel
 | DuckDuckGo | [https://duckduckgo.com](https://duckduckgo.com)     | 强调隐私保护的搜索引擎 |
 
 
-## 二、视频与娱乐
+### 二、视频与娱乐
 
 | 网站      | 网址                                                   | 主要用途         |
 | ------- | ---------------------------------------------------- | ------------ |
@@ -349,7 +349,7 @@ https://gitproxy.mrhjx.cn/https://github.com/clash-verge-rev/clash-verge-rev/rel
 | IMDb    | [https://www.imdb.com](https://www.imdb.com)         | 电影、电视剧资料与评分  |
 
 
-## 三、学习与科研
+### 三、学习与科研
 
 | 网站             | 网址                                                                 | 主要用途                |
 | -------------- | ------------------------------------------------------------------ | ------------------- |
@@ -363,7 +363,7 @@ https://gitproxy.mrhjx.cn/https://github.com/clash-verge-rev/clash-verge-rev/rel
 | edX            | [https://www.edx.org](https://www.edx.org)                         | 高校在线课程              |
 
 
-## 四、编程与软件开发
+### 四、编程与软件开发
 
 | 网站             | 网址                                                     | 主要用途          |
 | -------------- | ------------------------------------------------------ | ------------- |
@@ -374,7 +374,7 @@ https://gitproxy.mrhjx.cn/https://github.com/clash-verge-rev/clash-verge-rev/rel
 | PyPI           | [https://pypi.org](https://pypi.org)                   | Python软件包     |
 | Hugging Face   | [https://huggingface.co](https://huggingface.co)       | 人工智能模型、数据集和演示 |
 
-## 五、社交与社区
+### 五、社交与社区
 
 | 网站         | 网址                                                     | 主要用途         |
 | ---------- | ------------------------------------------------------ | ------------ |
@@ -385,7 +385,7 @@ https://gitproxy.mrhjx.cn/https://github.com/clash-verge-rev/clash-verge-rev/rel
 | LinkedIn   | [https://www.linkedin.com](https://www.linkedin.com)   | 求职、职业社交和学术履历 |
 | Discord    | [https://discord.com](https://discord.com)             | 群组聊天、游戏和学习社区 |
 | Telegram   | [https://telegram.org](https://telegram.org)           | 即时通信和频道订阅    |
-## 六、国际新闻
+### 六、国际新闻
 
 | 网站                   | 网址                                                         | 主要用途         |
 | -------------------- | ---------------------------------------------------------- | ------------ |
@@ -397,7 +397,7 @@ https://gitproxy.mrhjx.cn/https://github.com/clash-verge-rev/clash-verge-rev/rel
 | Financial Times      | [https://www.ft.com](https://www.ft.com)                   | 国际财经和商业新闻    |
 | The Economist        | [https://www.economist.com](https://www.economist.com)     | 国际政治、经济和评论   |
 
-## 七、人工智能工具
+### 七、人工智能工具
 
 | 网站                | 网址                                                             | 主要用途           |
 | ----------------- | -------------------------------------------------------------- | -------------- |
@@ -407,7 +407,7 @@ https://gitproxy.mrhjx.cn/https://github.com/clash-verge-rev/clash-verge-rev/rel
 | Perplexity        | [https://www.perplexity.ai](https://www.perplexity.ai)         | 联网搜索和问答        |
 | Microsoft Copilot | [https://copilot.microsoft.com](https://copilot.microsoft.com) | 搜索、写作和办公辅助     |
 | Hugging Face Chat | [https://huggingface.co/chat](https://huggingface.co/chat)     | 使用开源人工智能模型     |
-## 八、邮箱、网盘与办公
+### 八、邮箱、网盘与办公
 
 | 网站           | 网址                                                   | 主要用途         |
 | ------------ | ---------------------------------------------------- | ------------ |
