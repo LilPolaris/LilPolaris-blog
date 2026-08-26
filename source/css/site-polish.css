@@ -232,6 +232,10 @@ html[data-theme='light'] #article-container pre {
 }
 
 @media (max-width: 768px) {
+  #page-header.full_page {
+    height: 68svh;
+  }
+
   html[data-theme='light'] #nav {
     padding-right: 16px;
     padding-left: 16px;

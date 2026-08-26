@@ -19,9 +19,11 @@ nav:
 
 menu:
   首页: / || fas fa-home
-  归档: /archives/ || fas fa-archive
-  分类: /categories/ || fas fa-folder-open
-  标签: /tags/ || fas fa-tags
+  文章 || fas fa-feather-alt:
+    归档: /archives/ || fas fa-archive
+    分类: /categories/ || fas fa-folder-open
+    标签: /tags/ || fas fa-tags
+  关于: /about/ || fas fa-user
 
 # --------------------------------------
 # Code Blocks Settings
@@ -50,6 +52,7 @@ social:
    fab fa-bilibili: https://space.bilibili.com/321608204 || Bilibili || '#fb7299'
    #fas fa-envelope: mailto:你的邮箱@qq.com || Email || '#4a7dbe'
    fab fa-steam: https://steamcommunity.com/profiles/76561199467487592 || Steam || '#171a21'
+   fas fa-rss: /atom.xml || RSS || '#d97706'
   # fas fa-envelope: mailto:xxxxxx@gmail.com || Email || '#4a7dbe'
 
 # --------------------------------------
@@ -100,7 +103,7 @@ background:
 
 cover:
   # Disable the cover or not
-  index_enable: true
+  index_enable: false
   aside_enable: true
   archives_enable: true
   # When cover is not set, the default cover is displayed
@@ -114,7 +117,7 @@ error_img:
 
 # A simple 404 page
 error_404:
-  enable: true
+  enable: false
   subtitle: '页面走丢了，但星光还在前面。'
   background: /img/error-page.png
 
@@ -148,13 +151,13 @@ post_meta:
 # The position of site info, eg: 300px/300em/300rem/10%
 index_site_info_top:
 # The height of top_img, eg: 300px/300em/300rem
-index_top_img_height:
+index_top_img_height: 70vh
 
 # The subtitle on homepage
 subtitle:
   enable: true
   # Typewriter Effect
-  effect: true
+  effect: false
   # Customize typed.js
   # https://github.com/mattboldt/typed.js/#customization
   typed_option:
@@ -169,6 +172,7 @@ subtitle:
   source: false
   # If you close the typewriter effect, the subtitle will only show the first line of sub
   sub:
+    - "记录教程、校园生活与随笔"
     - "在隆冬，我终于得知，我身上有一个不可战胜的夏天"
     - "我的心略大于整个宇宙"
     - "哪有什么胜利可言，挺住意味着一切"
@@ -203,7 +207,7 @@ subtitle:
 # 5: Info displayed on the cover
 # 6: Masonry layout - Cover on top, info on the bottom
 # 7: Masonry layout - Info displayed on the cover
-index_layout: 3
+index_layout: 4
 
 # Display the article introduction on homepage
 # 1: description
@@ -211,9 +215,9 @@ index_layout: 3
 # 3: auto_excerpt (default)
 # false: do not show the article introduction
 index_post_content:
-  method: 3
+  method: 2
   # If you set method to 2 or 3, the length need to config
-  length: 180
+  length: 120
 
 # --------------------------------------
 # Post Settings
@@ -225,7 +229,7 @@ toc:
   number: true
   expand: false
   # Only for post
-  style_simple: false
+  style_simple: true
   scroll_percent: true
 
 post_copyright:
@@ -289,9 +293,9 @@ footer:
     since: 2025
   # Copyright of theme and framework
   copyright:
-    enable: true
-    version: true
-  custom_text: '<span id="runtime_span"></span>'
+    enable: false
+    version: false
+  custom_text:
   
 
 # --------------------------------------
@@ -303,7 +307,7 @@ aside:
   hide: false
   # Show the button to hide the aside in bottom right button
   button: true
-  mobile: true
+  mobile: false
   # Position: left / right
   position: right
   display:
@@ -315,14 +319,14 @@ aside:
     description: 玻璃晴朗，橘子辉煌
     button:
       enable: true
-      icon: fab fa-github
-      text: 去 GitHub
-      link: https://github.com/LilPolaris
+      icon: fas fa-user
+      text: 关于我
+      link: /about/
   card_announcement:
     enable: true
     content: 这里记录教程、校园生活，还有一些零散但认真的思考。
   card_recent_post:
-    enable: true
+    enable: false
     # If set 0 will show all
     limit: 5
     # Sort: date / updated
@@ -343,7 +347,7 @@ aside:
     expand: none
     sort_order:
   card_tags:
-    enable: true
+    enable: false
     # If set 0 will show all
     limit: 40
     color: false
@@ -354,7 +358,7 @@ aside:
     order: 1
     sort_order:
   card_archives:
-    enable: true
+    enable: false
     # Type: monthly / yearly
     type: monthly
     # Eg: YYYY年MM月
@@ -427,14 +431,14 @@ rightside_scroll_percent: true
 # Choose: readmode,translate,darkmode,hideAside,toc,chat,comment
 # Don't repeat the same value
 rightside_item_order:
-  enable: false
+  enable: true
   # Default: readmode,translate,darkmode,hideAside
   hide:
   # Default: toc,chat,comment
-  show:
+  show: readmode,darkmode,toc
 
 # Animation for the bottom right config button
-rightside_config_animation: true
+rightside_config_animation: false
 
 # --------------------------------------
 # Global Settings
@@ -457,13 +461,13 @@ copy:
 
 # Need to install the hexo-wordcount plugin
 wordcount:
-  enable: false
+  enable: true
   # Display the word count of the article in post meta
   post_wordcount: true
   # Display the time to read the article in post meta
   min2read: true
   # Display the total word count of the website in aside's webinfo
-  total_wordcount: true
+  total_wordcount: false
 
 # Busuanzi count for PV / UV in site
 busuanzi:
@@ -512,8 +516,6 @@ search:
 
   # Local Search
   local_search:
-    enable: true  # <--- 请手动加上这一行！!
-    # Preload the search data when the page loads.
     # Preload the search data when the page loads.
     preload: false
     # Show top n results per article, show all results by setting to -1
@@ -1108,6 +1110,7 @@ css_prefix: true
 # Insert the code to head (before '</head>' tag) and the bottom (before '</body>' tag)
 inject:
   head:
+    - '<link rel="preconnect" href="https://events.vercount.one" crossorigin>'
     - '<link rel="stylesheet" href="/css/site-polish.css">'
   bottom:
 
@@ -1139,7 +1142,8 @@ CDN:
     # artalk_css:
     # artalk_js:
     # blueimp_md5:
-    # busuanzi:
+    # Load Vercount after the page load event so local search is interactive first.
+    busuanzi: /js/vercount-loader.js
     # canvas_fluttering_ribbon:
     # canvas_nest:
     # canvas_ribbon:
