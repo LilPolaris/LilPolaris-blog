@@ -16,19 +16,19 @@
 先进入博客文件夹：
 
 ```powershell
-cd D:\常用\LilPolaris
+cd D:\LilPolaris-book
 ```
 
 新建文章：
 
 ```powershell
-npx hexo new post "文章标题"
+npm run new -- english-file-name
 ```
 
 这会在这里生成一个 Markdown 文件：
 
 ```text
-source/_posts/文章标题.md
+source/_posts/english-file-name.md
 ```
 
 打开这个文件，编辑开头的文章信息和正文：
@@ -67,12 +67,12 @@ http://localhost:4000
 发布到网站：
 
 ```powershell
-git add .
-git commit -m "新增文章标题"
-git push
+npm run push -- english-file-name
 ```
 
-推送后，GitHub Actions 会自动构建和部署。等几十秒到几分钟，网站会更新。
+这条命令会在首次推送前把 `date`、`first_published_at` 和 `updated` 统一写成
+上海时区的当前秒级时间，再构建、提交并推送。推送后 GitHub Actions 会自动
+构建和部署；等几十秒到几分钟，网站会更新。
 
 ## 修改旧文章并发布
 

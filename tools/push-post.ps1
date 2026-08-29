@@ -58,8 +58,31 @@ function Assert-PostIsReady {
   }
 }
 
-function Update-PostUpdatedTime {
-  param([string]$Path)
+function Get-ShanghaiTimestamp {
+  $zone = $null
+  foreach ($zoneId in @("China Standard Time", "Asia/Shanghai")) {
+    try {
+      $zone = [System.TimeZoneInfo]::FindSystemTimeZoneById($zoneId)
+      break
+    }
+    catch {
+      continue
+    }
+  }
+  if (-not $zone) {
+    throw "Could not resolve the Asia/Shanghai time zone."
+  }
+  return [System.TimeZoneInfo]::ConvertTimeFromUtc(
+    [System.DateTime]::UtcNow,
+    $zone
+  ).ToString("yyyy-MM-dd HH:mm:ss")
+}
+
+function Update-PostTimestamps {
+  param(
+    [string]$Path,
+    [bool]$FirstPublish
+  )
 
   $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
   $text = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
@@ -70,37 +93,73 @@ function Update-PostUpdatedTime {
     return
   }
 
-  $updated = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+  $timestamp = Get-ShanghaiTimestamp
   $front = $frontMatterMatch.Groups["front"].Value
   $lines = New-Object System.Collections.Generic.List[string]
   $front -split "\r?\n" | ForEach-Object { $lines.Add($_) }
 
-  $updatedIndex = -1
-  $dateIndex = -1
-
-  for ($i = 0; $i -lt $lines.Count; $i++) {
-    if ($lines[$i] -match "^updated:\s*") {
-      $updatedIndex = $i
-      break
+  function Get-FieldValue {
+    param(
+      [System.Collections.Generic.List[string]]$Values,
+      [string]$Name
+    )
+    $escapedName = [regex]::Escape($Name)
+    foreach ($line in $Values) {
+      if ($line -match "^${escapedName}:\s*(?<value>.*)$") {
+        return $Matches["value"].Trim()
+      }
     }
-    if ($dateIndex -eq -1 -and $lines[$i] -match "^date:\s*") {
-      $dateIndex = $i
-    }
+    return ""
   }
 
-  if ($updatedIndex -ge 0) {
-    $lines[$updatedIndex] = "updated: $updated"
-  } elseif ($dateIndex -ge 0) {
-    $lines.Insert($dateIndex + 1, "updated: $updated")
+  function Set-FieldValue {
+    param(
+      [System.Collections.Generic.List[string]]$Values,
+      [string]$Name,
+      [string]$Value,
+      [string]$After = ""
+    )
+    $escapedName = [regex]::Escape($Name)
+    for ($i = 0; $i -lt $Values.Count; $i++) {
+      if ($Values[$i] -match "^${escapedName}:\s*") {
+        $Values[$i] = "${Name}: $Value"
+        return
+      }
+    }
+    $insertIndex = 0
+    if ($After) {
+      $escapedAfter = [regex]::Escape($After)
+      for ($i = 0; $i -lt $Values.Count; $i++) {
+        if ($Values[$i] -match "^${escapedAfter}:\s*") {
+          $insertIndex = $i + 1
+          break
+        }
+      }
+    }
+    $Values.Insert($insertIndex, "${Name}: $Value")
+  }
+
+  if ($FirstPublish) {
+    Set-FieldValue $lines "date" $timestamp
+    Set-FieldValue $lines "first_published_at" $timestamp "date"
   } else {
-    $lines.Insert(0, "updated: $updated")
+    $firstPublished = Get-FieldValue $lines "first_published_at"
+    $existingDate = Get-FieldValue $lines "date"
+    if (-not $firstPublished -and $existingDate) {
+      Set-FieldValue $lines "first_published_at" $existingDate "date"
+    }
   }
+  Set-FieldValue $lines "updated" $timestamp "first_published_at"
 
   $newFront = $lines -join $newline
   $newText = "---$newline$newFront$newline---" + $text.Substring($frontMatterMatch.Length)
   [System.IO.File]::WriteAllText($Path, $newText, $utf8NoBom)
 
-  Write-Host "Updated front matter timestamp: $updated"
+  if ($FirstPublish) {
+    Write-Host "Set first publication timestamp: $timestamp (Asia/Shanghai)"
+  } else {
+    Write-Host "Updated front matter timestamp: $timestamp (Asia/Shanghai)"
+  }
 }
 
 Push-Location $repoRoot
@@ -124,6 +183,26 @@ try {
   if (-not $savedChanges) {
     $ahead = & git -c "safe.directory=$safeDir" rev-list --count '@{upstream}..HEAD'
     if ($LASTEXITCODE -eq 0 -and [int]$ahead -gt 0) {
+      & git -c "safe.directory=$safeDir" cat-file -e "@{upstream}:$postRel" 2>$null
+      $existsUpstream = $LASTEXITCODE -eq 0
+      if (-not $existsUpstream) {
+        Write-Host "The new post is committed locally but has not been published yet."
+        Assert-PostIsReady $postFile $Post
+        Update-PostTimestamps $postFile $true
+        Write-Host "Building site..."
+        & npm run build
+        if ($LASTEXITCODE -ne 0) {
+          throw "Build failed. Fix the error above before publishing."
+        }
+        & git -c "safe.directory=$safeDir" add -- $postRel
+        if ($LASTEXITCODE -ne 0) {
+          throw "git add failed."
+        }
+        & git -c "safe.directory=$safeDir" commit -m "Set publication time for $Post"
+        if ($LASTEXITCODE -ne 0) {
+          throw "Could not commit the first publication timestamp."
+        }
+      }
       Write-Host "No new article changes, but local commits are waiting to be pushed."
       & git -c "safe.directory=$safeDir" push
       if ($LASTEXITCODE -ne 0) {
@@ -135,20 +214,17 @@ try {
     throw "No saved changes found for $postRel. Save the editor file (Ctrl+S), then run this command again."
   }
 
+  & git -c "safe.directory=$safeDir" cat-file -e "@{upstream}:$postRel" 2>$null
+  $existsUpstream = $LASTEXITCODE -eq 0
+
   Assert-PostIsReady $postFile $Post
-  Update-PostUpdatedTime $postFile
+  Update-PostTimestamps $postFile (-not $existsUpstream)
 
   Write-Host "Building site..."
   & npm run build
   if ($LASTEXITCODE -ne 0) {
     throw "Build failed. Fix the error above before publishing."
   }
-
-  $trackedFiles = & git -c "safe.directory=$safeDir" ls-files -- $postRel
-  if ($LASTEXITCODE -ne 0) {
-    throw "Failed to inspect tracked files."
-  }
-  $isTracked = [bool]$trackedFiles
 
   Write-Host ""
   Write-Host "Staging:"
@@ -173,7 +249,7 @@ try {
   if ($MessageParts -and $MessageParts.Count -gt 0) {
     $message = $MessageParts -join " "
   } else {
-    $verb = if ($isTracked) { "Update" } else { "Add" }
+    $verb = if ($existsUpstream) { "Update" } else { "Add" }
     $prettyPost = $Post -replace "-", " "
     $message = "$verb $prettyPost"
   }
