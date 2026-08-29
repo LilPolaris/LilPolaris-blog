@@ -157,7 +157,7 @@ index_top_img_height: 70vh
 subtitle:
   enable: true
   # Typewriter Effect
-  effect: false
+  effect: true
   # Customize typed.js
   # https://github.com/mattboldt/typed.js/#customization
   typed_option:
@@ -172,7 +172,6 @@ subtitle:
   source: false
   # If you close the typewriter effect, the subtitle will only show the first line of sub
   sub:
-    - "记录教程、校园生活与随笔"
     - "在隆冬，我终于得知，我身上有一个不可战胜的夏天"
     - "我的心略大于整个宇宙"
     - "哪有什么胜利可言，挺住意味着一切"
