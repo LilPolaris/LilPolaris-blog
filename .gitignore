@@ -10,3 +10,8 @@ _multiconfig.yml
 .env.*
 !.env.example
 .deploy_keys/
+admin/.next/
+admin/coverage/
+admin/.launcher/
+*.tsbuildinfo
+.vercel/
