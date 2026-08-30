@@ -170,7 +170,8 @@ npm run build
 
 Vercel：
 
-1. 导入 `LilPolaris/LilPolaris-blog`。
+1. 使用独立项目 `lilpolaris-blog-admin` 导入 `LilPolaris/LilPolaris-blog`；
+   不要复用旧的 Eleventy 项目 `lilpolaris`。
 2. Root Directory 设置为 `admin`。
 3. 填写 `.env.example` 中的服务端环境变量。
 4. Production 设置 `CONTENT_WRITE_POLICY=production-main`；Preview 将
