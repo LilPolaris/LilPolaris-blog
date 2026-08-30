@@ -55,6 +55,11 @@ const envSchema = z.object({
   MAX_UPLOAD_MB: z.coerce.number().min(1).max(25).default(8),
   REPOSITORY_ADAPTER: z.enum(["github", "mock"]).default("github"),
   AUTH_MODE: z.enum(["oauth", "local-cli"]).default("oauth"),
+  CONTENT_WRITE_POLICY: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined),
   ADMIN_GITHUB_LOGIN: z.string().default("LilPolaris"),
   AUTH_SECRET: z.string().optional(),
   AUTH_GITHUB_ID: z.string().optional(),
@@ -164,4 +169,15 @@ export function requireGitHubToken() {
     );
   }
   return token;
+}
+
+export function getRepositoryWriteGuardEnvironment() {
+  const env = getEnvironment();
+  return {
+    authMode: env.AUTH_MODE,
+    contentWritePolicy: env.CONTENT_WRITE_POLICY,
+    vercel: process.env.VERCEL,
+    vercelEnv: process.env.VERCEL_ENV,
+    vercelTargetEnv: process.env.VERCEL_TARGET_ENV,
+  };
 }

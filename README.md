@@ -33,7 +33,7 @@ npm run build
 - `HEXO_DEPLOY_KEY`：公钥对 `LilPolaris.github.io` 具有写权限的 SSH 私钥
 
 文章、草稿和图片只通过管理后台写入 GitHub；本地仓库仅用于代码和主题开发。
-`npm run push` 已停用，并会在任何文件或 Git 操作前退出。日常操作参见
+`npm run push` 和 `npm run deploy` 已停用，并会在任何文件或 Git 操作前退出。日常操作参见
 [BLOG_GUIDE.md](BLOG_GUIDE.md)。
 
 ## 管理后台
@@ -55,6 +55,7 @@ npm run dev
 - `AUTH_SECRET`：使用 `npx auth secret` 或安全随机数生成
 - `AUTH_GITHUB_ID`、`AUTH_GITHUB_SECRET`：GitHub OAuth App 凭据
 - `ADMIN_GITHUB_LOGIN=LilPolaris`：唯一允许登录的 GitHub 用户
+- `CONTENT_WRITE_POLICY=production-main`：仅在 Production 确实需要写 `main` 时设置
 
 Windows 本机可运行 `admin/scripts/configure-local.ps1`，从已登录的 GitHub CLI 安全读取 Token 并生成仅供 localhost 使用的配置。根目录的“打开博客后台”启动器已经自动执行这一步，无需手动输入命令。
 
@@ -71,6 +72,16 @@ Windows 本机可运行 `admin/scripts/configure-local.ps1`，从已登录的 Gi
 - `GITHUB_WORKFLOW_ID=deploy.yml`
 
 不要使用 `NEXT_PUBLIC_` 暴露任何 Token 或 Secret。真实 `.env*` 已由根 `.gitignore` 排除。
+
+写入保护由 GitHub Repository Adapter 的中央包装层执行，不能由单个 API 绕过：
+
+- Vercel Preview 必须使用专用的非 `main` 分支；只要 `VERCEL_ENV` 或
+  `VERCEL_TARGET_ENV` 为 `preview`，`main` 写入始终返回 403，设置
+  `CONTENT_WRITE_POLICY` 也不能解锁；Preview 在任何分支上都不能触发部署工作流。
+- OAuth/Production 向 `main` 写入时必须显式设置
+  `CONTENT_WRITE_POLICY=production-main`，缺失或拼写错误都会 fail closed。
+- 非 Vercel 的本机 `AUTH_MODE=local-cli` 可写 `main`，无需生产解锁变量；
+  Mock Adapter 不应用此保护。
 
 后台默认使用 DeepSeek V4 Flash。API Key 可直接在后台“设置”页面粘贴，
 经 `AUTH_SECRET` 加密后保存在当前浏览器的 HttpOnly Cookie 中：
@@ -162,7 +173,9 @@ Vercel：
 1. 导入 `LilPolaris/LilPolaris-blog`。
 2. Root Directory 设置为 `admin`。
 3. 填写 `.env.example` 中的服务端环境变量。
-4. 将 OAuth callback URL 更新为 `https://后台域名/api/auth/callback/github`。
+4. Production 设置 `CONTENT_WRITE_POLICY=production-main`；Preview 将
+   `GITHUB_BRANCH` 指向专用测试分支，并且不要设置生产解锁变量。
+5. 将 OAuth callback URL 更新为 `https://后台域名/api/auth/callback/github`。
 
 Vercel Function 的请求体和响应体上限为 4.5 MB。后台不会把整篇文章的多张
 图片塞进一个 multipart 请求，而是逐图暂存，最终只发送文章 JSON 和签名 receipt。

@@ -44,6 +44,9 @@ export async function PUT(request: Request) {
     await requireAdminApi();
     const overrides = parseSettingsOverrides(await request.json());
     const config = { ...getBaseRepositoryConfig(), ...overrides };
+    // This temporary adapter is used only for the read-only connection check.
+    // Every runtime mutation must obtain its adapter through getRepository(),
+    // which applies the Preview/main write guard.
     const repository =
       config.adapter === "mock"
         ? new MockRepositoryAdapter(config)

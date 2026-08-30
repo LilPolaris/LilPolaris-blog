@@ -1,7 +1,11 @@
-import { requireGitHubToken } from "@/lib/config";
+import {
+  getRepositoryWriteGuardEnvironment,
+  requireGitHubToken,
+} from "@/lib/config";
 import { GitHubRepositoryAdapter } from "@/lib/repository/github";
 import { MockRepositoryAdapter } from "@/lib/repository/mock";
 import type { RepositoryAdapter } from "@/lib/repository/repository";
+import { withRepositoryWriteGuard } from "@/lib/repository/write-guard";
 import { getEffectiveRepositoryConfig } from "@/lib/settings";
 
 const processRepositoryState = process as NodeJS.Process & {
@@ -18,5 +22,12 @@ export async function getRepository(): Promise<RepositoryAdapter> {
       new MockRepositoryAdapter(config);
     return processRepositoryState.__lilpolarisMockRepository;
   }
-  return new GitHubRepositoryAdapter(config, requireGitHubToken());
+  const githubRepository = new GitHubRepositoryAdapter(
+    config,
+    requireGitHubToken(),
+  );
+  return withRepositoryWriteGuard(githubRepository, {
+    branch: config.branch,
+    ...getRepositoryWriteGuardEnvironment(),
+  });
 }

@@ -40,7 +40,8 @@ npm run build
 
 这两条命令只用于本地预览和验证。
 
-`npm run new` 只允许创建开发/主题调试用的本地内容。`npm run push` 已停用，并会在任何文件或 Git 操作前退出。
+`npm run new` 和 `npm run images` 只允许创建开发/主题调试用的本地内容。
+`npm run push` 与 `npm run deploy` 已停用，并会在任何文件或 Git 操作前退出。
 
 不要用以下方式发布文章：
 

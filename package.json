@@ -5,7 +5,7 @@
   "scripts": {
     "build": "hexo generate",
     "clean": "hexo clean",
-    "deploy": "hexo deploy",
+    "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/push-post.ps1",
     "images": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/add-post-images.ps1",
     "new": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/new-post.ps1",
     "push": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/push-post.ps1",

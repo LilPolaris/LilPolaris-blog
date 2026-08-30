@@ -12,6 +12,12 @@
 文章 JSON 和签名 receipt，并通过一次 Git Commit 同时公开正文与所有图片。
 原图上限 8 MiB、恢复副本总量 32 MiB 仅是浏览器本地限制。
 
+GitHub 写入统一经过 Repository Adapter 的中央保护。Vercel Preview 必须将
+`GITHUB_BRANCH` 设为非 `main` 的专用分支；Preview 中的 `main` 永远禁止写入，
+即使误设 `CONTENT_WRITE_POLICY=production-main` 也会返回 403。Production/OAuth
+只有显式设置该值才能写 `main`。非 Vercel 的本机 `local-cli` 和 Mock Adapter
+不需要生产解锁变量。Preview 在任何分支上都不能触发部署工作流。
+
 编辑器的“AI 智能生成”会根据中文标题、当前正文和历史已发布文章元数据回填英文文件名、
 标签和分类，默认连接 DeepSeek V4 Flash。API Key 可在“设置”页面粘贴，
 加密后保存在 HttpOnly Cookie 中；本地 Ollama 的切换示例见 `.env.example`。
