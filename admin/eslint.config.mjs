@@ -7,6 +7,7 @@ export default defineConfig([
   ...nextTypescript,
   globalIgnores([
     "**/.next/**",
+    ".launcher/**",
     "coverage/**",
     "LilPolaris-book/**",
     "next-env.d.ts",

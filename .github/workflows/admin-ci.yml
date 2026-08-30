@@ -6,10 +6,12 @@ on:
       - main
     paths:
       - "admin/**"
+      - "打开博客后台.cmd"
       - ".github/workflows/admin-ci.yml"
   pull_request:
     paths:
       - "admin/**"
+      - "打开博客后台.cmd"
       - ".github/workflows/admin-ci.yml"
 
 jobs:
@@ -44,3 +46,14 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  launcher-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test Windows launcher core
+        shell: powershell
+        run: .\admin\scripts\launcher-core.tests.ps1
