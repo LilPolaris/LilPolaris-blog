@@ -222,6 +222,7 @@ function Get-BuildFingerprint {
   $manifest = [ordered]@{
     schema = 1
     dependencyFingerprint = $DependencyFingerprint
+    physicalAdminPath = [System.IO.Path]::GetFullPath($AdminPath).ToLowerInvariant()
     environmentHash = $environmentHash
     files = $records
   }

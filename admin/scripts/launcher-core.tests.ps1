@@ -41,6 +41,10 @@ try {
   $buildTwo = Get-BuildFingerprint -AdminPath $adminPath -DependencyFingerprint $dependencyOne -EnvironmentPath $environmentPath
   Assert-Equal $buildOne $buildTwo "build fingerprints must be deterministic"
   Assert-True (-not $buildOne.Contains($secret)) "the final fingerprint must not expose environment values"
+  $relocatedAdmin = Join-Path $testRoot "relocated-admin"
+  Copy-Item -LiteralPath $adminPath -Destination $relocatedAdmin -Recurse
+  $relocatedBuild = Get-BuildFingerprint -AdminPath $relocatedAdmin -DependencyFingerprint $dependencyOne -EnvironmentPath (Join-Path $relocatedAdmin ".env.local")
+  Assert-True ($buildOne -ne $relocatedBuild) "the physical admin path must affect the build fingerprint"
   [System.IO.File]::WriteAllText((Join-Path $sourcePath "page.ts"), 'export const value = 2;')
   $sourceChanged = Get-BuildFingerprint -AdminPath $adminPath -DependencyFingerprint $dependencyOne -EnvironmentPath $environmentPath
   Assert-True ($buildOne -ne $sourceChanged) "source content must affect the build fingerprint"
