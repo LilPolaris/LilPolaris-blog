@@ -32,12 +32,14 @@ npm run build
 
 - `HEXO_DEPLOY_KEY`：公钥对 `LilPolaris.github.io` 具有写权限的 SSH 私钥
 
-更多现有博客操作参见 [BLOG_GUIDE.md](BLOG_GUIDE.md)。
+文章、草稿和图片只通过管理后台写入 GitHub；本地仓库仅用于代码和主题开发。
+`npm run push` 已停用，并会在任何文件或 Git 操作前退出。日常操作参见
+[BLOG_GUIDE.md](BLOG_GUIDE.md)。
 
 ## 管理后台
 
 ```powershell
-cd D:\LilPolaris-book\admin
+cd D:\book-back-tool\admin
 Copy-Item .env.example .env.local
 npm ci
 npm run dev
@@ -115,7 +117,7 @@ OAuth 仅确认登录身份；仓库写入使用单独的服务端 Token。
 - CodeMirror Live Preview 与 Markdown 源码双模式，共享正文、选区、撤销历史和本地恢复
 - 标题与英文文件名分离、公开 URL 提示、文章目录、字数/阅读时间和 `/` 快捷命令
 - 根据中文标题和历史元数据，用本地 Qwen 或 DeepSeek 生成英文文件名、标签和分类建议
-- 图片可直接粘贴或拖入，先保存在 IndexedDB，保存时与正文通过单个 Git Commit 原子提交
+- 图片可直接粘贴或拖入，先保存在 IndexedDB；必要时浏览器压缩并逐图暂存为不可达 Git Blob，最终与正文通过单个 Git Commit 原子提交
 - “随笔”等快捷模板自动跳过文章与草稿中的已占用序号；常用标签和多级分类一键添加
 - YAML Front Matter 未知字段保留、多级分类和 slug/资源目录同步移动
 - IndexedDB 本地恢复、离开提醒、GitHub SHA 冲突提示和强制保存
@@ -133,19 +135,21 @@ Markdown 标记。`Ctrl+Shift+M` 切换源码模式，`Ctrl+S` 保存草稿，
 未发布草稿不再占用 `date`。首次发布会同时写入 Hexo 使用的 `date` 和
 `first_published_at`；旧文章缺少后者时自动沿用原有 `date`，并在后续保存时懒回填。
 
-粘贴图片单文件限制 8 MiB、单篇待提交图片总量限制 32 MiB。保存失败时
-Blob 与正文恢复副本仍留在本机浏览器中，不会在仓库留下已引用但未提交的图片。
+原图选择限制为单文件 8 MiB、单篇本地恢复副本总量 32 MiB；这两个数字不是
+Vercel Function 的请求上限。超过 3.5 MiB 的 JPG、PNG、WebP 会在浏览器中转为
+适合上传的 WebP，再逐张暂存。保存失败时 Blob 与正文恢复副本仍留在浏览器中；
+暂存 Git Blob 未挂到分支，不会形成已发布一半的文章。
 
 ## 验证
 
 ```powershell
-cd D:\LilPolaris-book\admin
+cd D:\book-back-tool\admin
 npm run lint
 npm run typecheck
 npm test
 npm run build
 
-cd D:\LilPolaris-book
+cd D:\book-back-tool
 npm run build
 ```
 
@@ -160,10 +164,13 @@ Vercel：
 3. 填写 `.env.example` 中的服务端环境变量。
 4. 将 OAuth callback URL 更新为 `https://后台域名/api/auth/callback/github`。
 
+Vercel Function 的请求体和响应体上限为 4.5 MB。后台不会把整篇文章的多张
+图片塞进一个 multipart 请求，而是逐图暂存，最终只发送文章 JSON 和签名 receipt。
+
 Docker：
 
 ```powershell
-cd D:\LilPolaris-book\admin
+cd D:\book-back-tool\admin
 docker build -t lilpolaris-blog-admin .
 docker run --env-file .env.local -p 3000:3000 lilpolaris-blog-admin
 ```
@@ -175,5 +182,8 @@ docker run --env-file .env.local -p 3000:3000 lilpolaris-blog-admin
 - 404：检查 owner、repo、branch 和 Hexo 路径。
 - 409：远程文件已变化；先查看远程内容，再选择重新加载或明确强制保存。
 - 422：通常为旧 SHA、目标文件冲突或工作流不支持 `workflow_dispatch`。
+- 413：图片未在浏览器端压缩到暂存接口允许的大小；GIF/AVIF 需先手工转换。
 - 后台不会记录 Token，不通过 URL 传 Token，也不会把 Token 存入 Local Storage。
+- 每个 API 错误都会返回请求 ID；本机日志位于 `admin/.launcher/logs`，Vercel
+  环境可用同一请求 ID 查询 Runtime Logs。
 - 自动化测试只使用 Mock Adapter，不会修改真实文章或触发真实部署。

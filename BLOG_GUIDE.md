@@ -1,309 +1,111 @@
 # LilPolaris 博客日常使用说明书
 
-这份说明写给未来的自己：忘记怎么发博客时，照着做就行。
+这份说明写给未来的自己：文章、草稿和图片统一从博客后台发布，不再通过本地 Git 发布内容。
 
-## 现在的博客结构
+## 现在的结构
 
-这个博客现在分成两个 GitHub 仓库：
+- `LilPolaris-blog`：唯一内容源，保存 Markdown、图片、Hexo、主题和后台代码。
+- `LilPolaris.github.io`：GitHub Actions 生成的成品站点。
+- 本地仓库：只用于开发后台、主题和构建代码，不承担日常文章发布。
 
-- `LilPolaris-blog`：源码仓库，保存文章 Markdown、Hexo 配置、Butterfly 配置、主题子模块、自动部署工作流。
-- `LilPolaris.github.io`：成品仓库，保存生成后的 HTML/CSS/JS，也就是浏览器真正访问的网站内容。
-
-日常只需要维护 `LilPolaris-blog` 这份源码。推送源码后，GitHub Actions 会自动生成并发布网站。
-
-## 最常用流程：新写一篇文章并发布
-
-先进入博客文件夹：
-
-```powershell
-cd D:\LilPolaris-book
-```
-
-新建文章：
-
-```powershell
-npm run new -- english-file-name
-```
-
-这会在这里生成一个 Markdown 文件：
+发布链路固定为：
 
 ```text
-source/_posts/english-file-name.md
+浏览器后台 → GitHub 源码仓库 → GitHub Actions → Hexo → GitHub Pages
 ```
 
-打开这个文件，编辑开头的文章信息和正文：
+## 新建、修改和发布文章
 
-```markdown
----
-title: 文章标题
-date: 2026-04-27 16:00:00
-updated: 2026-04-27 16:00:00
-tags:
-  - 标签1
-  - 标签2
-categories:
-  - 分类
-keywords: 关键词1, 关键词2
-description: 这是一句话文章摘要，会影响首页摘要和搜索展示。
----
+1. 双击仓库根目录的 `打开博客后台.cmd`。
+2. 使用本机 GitHub 身份登录。
+3. 在“文章”或“草稿”中编辑内容；图片可粘贴、拖入或从媒体库选择。
+4. 点“保存草稿”只保存草稿，点“发布”写入正式文章目录。
+5. 到“部署记录”查看 GitHub Actions 状态。
 
-这里开始写正文。
-```
+后台通过 GitHub API 直接操作远端仓库，本机是否刚执行过 `git pull` 不影响文章发布。
 
-写完后，本地预览：
+## 图片规则
+
+- 原图选择上限为单张 8 MiB，单篇本地恢复副本总量为 32 MiB。
+- 为适配 Vercel，静态大图会在浏览器中优化后逐张暂存；GIF/AVIF 过大时会提示先手动转换。
+- 正文和所有暂存图片最终仍在一个 Git Commit 中出现；任一步失败都不会在分支留下半成品。
+- 最终文件名使用 `YYYYMMDD-original-name-shortcode.ext`，只保留安全的小写英文、数字和短横线。
+
+## 本地命令的职责
 
 ```powershell
 npm run server
-```
-
-浏览器打开：
-
-```text
-http://localhost:4000
-```
-
-确认没问题后，在终端按 `Ctrl + C` 停止预览。
-
-发布到网站：
-
-```powershell
-npm run push -- english-file-name
-```
-
-这条命令会在首次推送前把 `date`、`first_published_at` 和 `updated` 统一写成
-上海时区的当前秒级时间，再构建、提交并推送。推送后 GitHub Actions 会自动
-构建和部署；等几十秒到几分钟，网站会更新。
-
-## 修改旧文章并发布
-
-直接打开对应文件：
-
-```text
-source/_posts/xxx.md
-```
-
-修改内容后，建议更新 front-matter 里的 `updated` 时间。
-
-本地预览：
-
-```powershell
-npm run server
-```
-
-确认没问题后发布：
-
-```powershell
-git add .
-git commit -m "更新 xxx"
-git push
-```
-
-## 三个 Git 命令是什么意思
-
-```powershell
-git add .
-```
-
-把当前文件夹里的所有改动加入“准备提交”的列表。
-
-```powershell
-git commit -m "这次改动的说明"
-```
-
-把准备提交的改动保存成一个版本，并写一句说明。
-
-```powershell
-git push
-```
-
-把本地版本推到 GitHub 的 `LilPolaris-blog`，并触发自动部署。
-
-## Hexo 命令是什么意思
-
-```powershell
-hexo g
-```
-
-等于 `hexo generate`，把 Markdown 文章生成 HTML，输出到 `public/`。
-
-```powershell
-hexo d
-```
-
-等于 `hexo deploy`，把 `public/` 推到 `LilPolaris.github.io`。
-
-```powershell
 npm run build
 ```
 
-项目脚本，等于 `hexo generate`。
+这两条命令只用于本地预览和验证。
 
-```powershell
-npm run deploy
-```
+`npm run new` 只允许创建开发/主题调试用的本地内容。`npm run push` 已停用，并会在任何文件或 Git 操作前退出。
 
-项目脚本，等于 `hexo deploy`。
-
-现在日常一般不用手动 `hexo g` / `hexo d`，因为 `git push` 后 GitHub Actions 会自动构建和发布。
-
-## 自动部署怎么确认成功
-
-打开源码仓库：
+不要用以下方式发布文章：
 
 ```text
-https://github.com/LilPolaris/LilPolaris-blog
+npm run push
+git add source/_posts
+git commit
+git push
+hexo deploy
 ```
 
-进入 `Actions` 页面，查看最新的 `Deploy Hexo Site`。
+开发后台或主题时仍可正常使用 Git，但开始前应先确认工作树干净并同步远端。
 
-- 绿色对勾：部署成功。
-- 红色叉：部署失败，点进去看失败步骤。
+## 确认自动部署
 
-如果部署成功，网站仓库 `LilPolaris.github.io` 会被自动更新。
-
-## 评论区说明
-
-评论区使用 Utterances。
-
-评论数据存在 `LilPolaris.github.io` 仓库的 GitHub Issues 里。
-
-如果评论区不显示，优先检查：
-
-1. `LilPolaris.github.io` 仓库是否开启了 Issues。
-2. Utterances GitHub App 是否授权了 `LilPolaris.github.io` 仓库。
-3. 页面是否已经部署到最新版本。
-
-主题配置在：
-
-```text
-_config.butterfly.yml
-```
-
-相关配置：
-
-```yaml
-comments:
-  use: Utterances
-
-utterances:
-  repo: LilPolaris/LilPolaris.github.io
-```
-
-## 代码块体验
-
-代码块已经做了这些设置：
-
-- 显示复制按钮。
-- 显示语言名。
-- Mac 风格窗口头。
-- 自动换行。
-- 长代码块高度限制为 520px。
-
-配置位置：
-
-```text
-_config.butterfly.yml
-```
-
-相关配置：
-
-```yaml
-code_blocks:
-  macStyle: true
-  height_limit: 520
-  word_wrap: true
-  copy: true
-  language: true
-```
-
-## 访问统计
-
-目前使用 Butterfly 内置支持的不蒜子统计：
-
-```yaml
-busuanzi:
-  site_uv: true
-  site_pv: true
-  page_pv: true
-```
-
-这会显示站点访问量、访客数、文章浏览量。
-
-如果以后想用 Umami 或 Google Analytics，需要先去对应平台创建站点，拿到 `website_id` 或 `G-xxxx` ID，再填到主题配置里。
-
-## 自动部署密钥
-
-自动部署需要两边配置：
-
-1. `LilPolaris.github.io` 仓库的 `Deploy keys` 里添加 public key，并勾选 `Allow write access`。
-2. `LilPolaris-blog` 仓库的 `Actions secrets` 里添加 `HEXO_DEPLOY_KEY`，值是 private key 的完整内容。
-
-本地密钥文件在：
-
-```text
-.deploy_keys/hexo_deploy
-.deploy_keys/hexo_deploy.pub
-```
-
-注意：private key 不要发给别人，也不要提交到 GitHub。这个文件夹已经写进 `.gitignore`。
-
-## 如果忘了当前有没有改动
-
-运行：
-
-```powershell
-git status
-```
-
-常见情况：
-
-- `nothing to commit, working tree clean`：没有未保存改动。
-- 出现红色文件：这些文件改了，但还没 `git add`。
-- 出现绿色文件：这些文件已经 `git add`，但还没 `git commit`。
-
-## 如果只想本地看看，不发布
-
-```powershell
-npm run server
-```
-
-打开：
-
-```text
-http://localhost:4000
-```
-
-只预览不会发布。只有执行 `git push` 后，自动部署才会开始。
-
-## 如果自动部署失败
-
-先打开：
+打开后台“部署记录”，或访问：
 
 ```text
 https://github.com/LilPolaris/LilPolaris-blog/actions
 ```
 
-点最新失败的 `Deploy Hexo Site`，看哪个步骤红了。
+- 绿色对勾：源码已构建并发布。
+- 红色叉：点开失败步骤；结合后台显示的请求 ID 和 Vercel/GitHub 日志排查。
+- 取消：通常是短时间内连续保存，新运行按并发策略替换了旧运行。
 
-常见原因：
+公开站点：
 
-- `Install dependencies` 失败：依赖安装问题，通常和 `package-lock.json` 或 npm 网络有关。
-- `Build site` 失败：文章 front-matter、Markdown、配置文件有语法错误。
-- `Configure deploy key` 失败：`HEXO_DEPLOY_KEY` 没填对。
-- `Push generated site` 失败：Deploy key 没加到 `LilPolaris.github.io`，或者没勾 `Allow write access`。
+```text
+https://lilpolaris.github.io
+```
+
+## 评论与统计
+
+评论使用 Utterances，数据位于 `LilPolaris.github.io` 的 GitHub Issues。评论不显示时检查仓库 Issues、Utterances App 授权和页面是否已经完成部署。
+
+访问统计使用 Butterfly 内置的不蒜子配置；主题设置位于 `_config.butterfly.yml`。
+
+## 本地开发验证
+
+```powershell
+cd D:\book-back-tool\admin
+npm ci
+npm run lint
+npm run typecheck
+npm test
+npm run build
+
+cd D:\book-back-tool
+npm ci
+npm run build
+```
+
+自动化测试使用 Mock Adapter，不会写入真实文章仓库。
+
+## 故障速查
+
+- 后台打不开：查看 `admin/.launcher/logs`，不要只检查 3199 是否返回 200。
+- 401：检查登录会话和 OAuth callback URL。
+- 403：检查管理员 GitHub 用户和服务端 Token 权限。
+- 409：远端文章已经变化，重新加载后再保存。
+- 413：图片没有在浏览器阶段压到 Vercel 安全范围。
+- 内容已保存但网站未更新：查看“部署记录”，不要再次用本地 Git 发布。
 
 ## 一句话记忆
 
-以前是：
-
 ```text
-hexo g -> hexo d
+写文章和传图只用后台；本地 Git 只开发代码。
 ```
-
-现在是：
-
-```text
-写文章 -> git add . -> git commit -m "说明" -> git push
-```
-
-GitHub 会自动帮你完成生成和发布。

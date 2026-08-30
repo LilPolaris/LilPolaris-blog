@@ -30,8 +30,8 @@ try {
   Write-Host "source/_posts/$Post.md"
   Write-Host "source/_posts/$Post/"
   Write-Host ""
-  Write-Host "Edit the Markdown file, put images in the folder if needed, then run:"
-  Write-Host "npm run push -- $Post"
+  Write-Host "This command is for local theme/build development only."
+  Write-Host "It cannot publish content. Use the Blog Admin for real articles and media."
 }
 finally {
   Pop-Location
