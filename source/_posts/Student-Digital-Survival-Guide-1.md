@@ -1,11 +1,11 @@
 ---
 title: 大学生数字生存指南-1——科学上网（上）
 tags:
-  - 教程
   - 计算机
 categories:
-  - - 教程
-    - 分享
+  - 教程
+series: 大学生数字生存指南
+toc_style_simple: false
 date: 2026-07-25 16:42:42
 updated: 2026-07-27 18:45:22
 excerpt: 原子文件生成中...

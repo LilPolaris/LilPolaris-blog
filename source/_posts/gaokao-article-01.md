@@ -4,9 +4,9 @@ date: 2026-06-13 12:19:15
 updated: 2026-06-13 12:33:45
 tags:
     - 高考作文
-categories:
-    - 高中
     - 语文
+categories:
+    - [校园, 高中]
 keywords: 2026新一卷作文
 description: 很讨厌今年新一卷作文，我觉得令人作呕
 ---

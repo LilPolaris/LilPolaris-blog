@@ -3,7 +3,7 @@ title: 转载-如何评价“丑的照杀”
 tags:
   - 转载
 categories:
-  - - 转载
+  - 转载
 date: 2026-07-30 16:19:50
 updated: 2026-07-30 16:19:50
 excerpt: 与君共勉
