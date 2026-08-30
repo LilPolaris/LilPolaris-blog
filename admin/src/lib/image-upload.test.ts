@@ -3,6 +3,8 @@ import sharp from "sharp";
 import {
   detectImageContentType,
   normalizeImageBytes,
+  STAGED_IMAGE_MAX_BYTES,
+  validateStagedImageBytes,
 } from "@/lib/image-upload";
 
 describe("image upload normalization", () => {
@@ -49,5 +51,21 @@ describe("image upload normalization", () => {
     await expect(
       normalizeImageBytes(new Uint8Array([1, 2, 3]), "image/png"),
     ).rejects.toMatchObject({ code: "UPLOAD_INVALID" });
+  });
+
+  it("strictly checks staged size, extension, MIME, and magic bytes", () => {
+    const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(validateStagedImageBytes(png, "20260830-cover-abcdef.png", "image/png"))
+      .toBe("image/png");
+    expect(() =>
+      validateStagedImageBytes(png, "20260830-cover-abcdef.jpg", "image/jpeg"),
+    ).toThrow(/内容不一致/);
+    expect(() =>
+      validateStagedImageBytes(
+        new Uint8Array(STAGED_IMAGE_MAX_BYTES + 1),
+        "20260830-cover-abcdef.png",
+        "image/png",
+      ),
+    ).toThrow(/3\.5 MiB/);
   });
 });

@@ -14,15 +14,26 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { mediaMarkdown } from "@/components/media/media-markdown";
+import {
+  MAX_ORIGINAL_IMAGE_BYTES,
+  prepareImageForUpload,
+  validateOriginalImage,
+} from "@/lib/client-image";
 import { formatBytes, formatDate } from "@/lib/format";
 import type { MediaAsset, PostKind } from "@/lib/types";
 
-type UploadStatus = "queued" | "uploading" | "success" | "error";
+type UploadStatus =
+  | "queued"
+  | "preparing"
+  | "uploading"
+  | "success"
+  | "error";
 
 interface UploadTask {
   error?: string;
   file: File;
   id: string;
+  preparedSize?: number;
   progress: number;
   retryable?: boolean;
   status: UploadStatus;
@@ -40,12 +51,16 @@ const IMAGE_FILE_PATTERN = /\.(?:jpe?g|png|gif|webp|avif)$/i;
 
 function requestError(response: XMLHttpRequest) {
   try {
-    return (
-      JSON.parse(response.responseText)?.error?.message ||
-      "上传失败，请稍后重试。"
-    );
+    const error = JSON.parse(response.responseText)?.error;
+    const message = error?.message || "上传失败，请稍后重试。";
+    const requestId =
+      error?.requestId || response.getResponseHeader("X-Request-ID");
+    return requestId ? `${message}（请求 ID：${requestId}）` : message;
   } catch {
-    return "上传失败，请稍后重试。";
+    const requestId = response.getResponseHeader("X-Request-ID");
+    return requestId
+      ? `上传失败，请稍后重试。（请求 ID：${requestId}）`
+      : "上传失败，请稍后重试。";
   }
 }
 
@@ -153,10 +168,16 @@ export function MediaLibrary({
     processingRef.current = true;
     while (queueRef.current.length && !uploadController.signal.aborted) {
       const task = queueRef.current.shift()!;
-      updateUpload(task.id, { status: "uploading", progress: 0, error: undefined });
+      updateUpload(task.id, { status: "preparing", progress: 0, error: undefined });
       try {
+        const prepared = await prepareImageForUpload(task.file);
+        if (uploadController.signal.aborted) break;
+        updateUpload(task.id, {
+          preparedSize: prepared.file.size,
+          status: "uploading",
+        });
         const item = await uploadRequest(
-          task.file,
+          prepared.file,
           (progress) => updateUpload(task.id, { progress }),
           uploadController.signal,
         );
@@ -183,14 +204,26 @@ export function MediaLibrary({
     const nextTasks = files.map((file): UploadTask => {
       uploadSequenceRef.current += 1;
       const id = `${Date.now()}-${uploadSequenceRef.current}-${file.name}-${file.size}`;
-      if (file.size > limitMb * 1024 * 1024) {
+      try {
+        validateOriginalImage(file);
+      } catch (error) {
         return {
           id,
           file,
           progress: 0,
           retryable: false,
           status: "error",
-          error: `超过 ${limitMb} MiB 限制。`,
+          error: error instanceof Error ? error.message : "无法读取图片。",
+        };
+      }
+      if (file.size > Math.min(limitMb * 1024 * 1024, MAX_ORIGINAL_IMAGE_BYTES)) {
+        return {
+          id,
+          file,
+          progress: 0,
+          retryable: false,
+          status: "error",
+          error: `超过 ${Math.min(limitMb, 8)} MiB 原图限制。`,
         };
       }
       if (!IMAGE_FILE_PATTERN.test(file.name)) {
@@ -200,7 +233,7 @@ export function MediaLibrary({
           progress: 0,
           retryable: false,
           status: "error",
-          error: "不支持此文件格式。",
+          error: "图片扩展名与支持的格式不匹配。",
         };
       }
       queueRef.current.push({ id, file });
@@ -370,7 +403,7 @@ export function MediaLibrary({
         <div>
           拖拽多张图片到这里，系统会逐个上传
           <div className="field-help" style={{ marginTop: 4 }}>
-            支持 JPG、PNG、GIF、WebP、AVIF，单个文件最大 {limitMb} MiB
+            原图最大 {Math.min(limitMb, 8)} MiB；超过 3.5 MiB 的 JPG、PNG、WebP 会在浏览器压缩，GIF/AVIF 请手动压缩
           </div>
         </div>
       </div>
@@ -396,8 +429,13 @@ export function MediaLibrary({
               <div className="upload-task-copy">
                 <strong title={task.file.name}>{task.file.name}</strong>
                 <span>
-                  {formatBytes(task.file.size)} · {task.status === "queued"
+                  {formatBytes(task.file.size)}
+                  {task.preparedSize && task.preparedSize !== task.file.size
+                    ? ` → ${formatBytes(task.preparedSize)}`
+                    : ""} · {task.status === "queued"
                     ? "等待上传"
+                    : task.status === "preparing"
+                      ? "正在检查或压缩"
                     : task.status === "uploading"
                       ? `上传中 ${task.progress}%`
                       : task.status === "success"
@@ -419,7 +457,11 @@ export function MediaLibrary({
                 <Check aria-label="上传成功" className="success-text" size={17} />
               ) : (
                 <span className="badge warning">
-                  {task.status === "queued" ? "排队中" : "上传中"}
+                  {task.status === "queued"
+                    ? "排队中"
+                    : task.status === "preparing"
+                      ? "准备中"
+                      : "上传中"}
                 </span>
               )}
             </div>

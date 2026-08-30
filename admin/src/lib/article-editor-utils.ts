@@ -1,4 +1,4 @@
-import type { EditableFrontMatter, PostKind } from "@/lib/types";
+import type { EditableFrontMatter, PendingMedia, PostKind } from "@/lib/types";
 
 const SAFE_SLUG = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
@@ -62,14 +62,22 @@ export function migrateRecoveredFrontMatter(
 
 export function replaceUploadedMediaNames(
   markdown: string,
-  mediaNameMap: Record<string, string>,
+  submittedMedia: ReadonlyArray<Pick<PendingMedia, "id" | "name">>,
+  mediaNamesById: Record<string, string>,
 ) {
-  return Object.entries(mediaNameMap).reduce(
-    (current, [originalName, uploadedName]) =>
-      current.replaceAll(
-        `{% asset_img "${originalName}"`,
-        `{% asset_img "${uploadedName}"`,
-      ),
-    markdown,
+  const uploadedNamesByReference = new Map(
+    submittedMedia.flatMap((media) => {
+      const uploadedName = mediaNamesById[media.id];
+      return uploadedName ? [[media.name, uploadedName] as const] : [];
+    }),
+  );
+  return markdown.replace(
+    /(\{%\s*asset_img\s+)(["'])([^"'\r\n]+)\2/g,
+    (tag, prefix: string, quote: string, referenceName: string) => {
+      const uploadedName = uploadedNamesByReference.get(referenceName);
+      return uploadedName
+        ? `${prefix}${quote}${uploadedName}${quote}`
+        : tag;
+    },
   );
 }

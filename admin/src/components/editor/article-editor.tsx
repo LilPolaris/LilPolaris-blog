@@ -44,6 +44,11 @@ import { livePreviewExtension } from "@/components/editor/live-preview-extension
 import { MediaPickerDialog } from "@/components/media/media-picker";
 import { formatBlogTimestamp } from "@/lib/blog-time";
 import {
+  imageFile,
+  mapWithConcurrency,
+  prepareImageForUpload,
+} from "@/lib/client-image";
+import {
   articleContentForAi,
   kindForRegularSave,
   migrateRecoveredFrontMatter,
@@ -73,6 +78,7 @@ import type {
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), {
   ssr: false,
 });
+const EDITOR_FLASH_KEY = "lilpolaris-editor-flash";
 
 type SaveState =
   | "idle"
@@ -130,11 +136,72 @@ async function responseError(
   fallback = "保存失败，请稍后重试。",
 ) {
   const data = await response.json().catch(() => ({}));
+  const requestId =
+    data?.error?.requestId || response.headers.get("X-Request-ID") || undefined;
+  const baseMessage = data?.error?.message || fallback;
   return {
-    message: data?.error?.message || fallback,
+    message: requestId ? `${baseMessage}（请求 ID：${requestId}）` : baseMessage,
     code: data?.error?.code,
     details: data?.error?.details,
+    requestId,
   };
+}
+
+interface StagedMediaResponse {
+  contentType: string;
+  id: string;
+  preparedName: string;
+  receipt: string;
+  size: number;
+}
+
+function boundedOriginalName(name: string) {
+  if (name.length <= 200) return name;
+  const dot = name.lastIndexOf(".");
+  const extension = dot > 0 ? name.slice(dot) : "";
+  return `${name.slice(0, Math.max(1, 200 - extension.length))}${extension}`;
+}
+
+async function stagePendingMedia(media: PendingMedia) {
+  const storedName = media.blob instanceof File ? media.blob.name : media.name;
+  const originalName = boundedOriginalName(storedName);
+  const original = imageFile(media.blob, storedName, media.contentType);
+  const prepared = await prepareImageForUpload(original);
+  const preparedExtension = prepared.file.name.split(".").at(-1) || "webp";
+  const preparedReferenceName = media.name.replace(
+    /.[^.]+$/,
+    `.${preparedExtension.toLowerCase()}`,
+  );
+  const preparedFile = imageFile(
+    prepared.file,
+    preparedReferenceName,
+    prepared.file.type,
+  );
+  const form = new FormData();
+  form.set("file", preparedFile, preparedFile.name);
+  form.set("id", media.id);
+  form.set("referenceName", media.name);
+  form.set("originalName", originalName);
+  const response = await fetch("/api/posts/media/stage", {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) {
+    throw new Error(
+      (await responseError(response, `图片 ${media.name} 暂存失败。`)).message,
+    );
+  }
+  const payload = await response.json();
+  const staged = (payload.data || payload) as StagedMediaResponse;
+  if (
+    staged.id !== media.id ||
+    !staged.preparedName ||
+    !staged.receipt ||
+    staged.size > Math.floor(3.5 * 1024 * 1024)
+  ) {
+    throw new Error(`图片 ${media.name} 的暂存响应不完整。`);
+  }
+  return staged;
 }
 
 function readingStats(markdownBody: string) {
@@ -181,6 +248,9 @@ export function ArticleEditor({
       : undefined,
   );
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
+  const [stagedAssetUrls, setStagedAssetUrls] = useState<
+    Record<string, string>
+  >({});
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState("");
@@ -218,13 +288,15 @@ export function ArticleEditor({
   const currentSlug = remote?.path.split("/").at(-1)?.replace(/\.md$/, "");
 
   const assetUrls = useMemo(
-    () =>
-      Object.fromEntries(
+    () => ({
+      ...Object.fromEntries(
         pendingMedia
           .filter((media) => media.previewUrl)
           .map((media) => [media.name, media.previewUrl!]),
       ),
-    [pendingMedia],
+      ...stagedAssetUrls,
+    }),
+    [pendingMedia, stagedAssetUrls],
   );
 
   useEffect(() => {
@@ -239,6 +311,17 @@ export function ArticleEditor({
         });
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const flash = window.sessionStorage.getItem(EDITOR_FLASH_KEY);
+    if (!flash) return;
+    window.sessionStorage.removeItem(EDITOR_FLASH_KEY);
+    const timer = window.setTimeout(() => {
+      setMessage(flash);
+      setSaveState("remote-saved");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -305,10 +388,15 @@ export function ArticleEditor({
         return false;
       }
       try {
-        const additions = files.map((file) => ({
-          ...createPendingMedia(file),
-          alt: file.name.replace(/\.[^.]+$/, "") || "图片描述",
-        }));
+        const occupiedNames = new Set(pendingMedia.map((media) => media.name));
+        const additions = files.map((file) => {
+          const media = createPendingMedia(file, { occupiedNames });
+          occupiedNames.add(media.name);
+          return {
+            ...media,
+            alt: file.name.replace(/\.[^.]+$/, "") || "图片描述",
+          };
+        });
         const total =
           pendingMedia.reduce(
             (sum, media) => sum + media.size,
@@ -763,41 +851,62 @@ export function ArticleEditor({
       const referencedMedia = pendingMedia.filter((media) =>
         isPendingMediaReferenced(body, media),
       );
-      const form = new FormData();
-      form.set(
-        "payload",
-        JSON.stringify({
-          currentPath: remote?.path,
-          expectedSha: remote?.sha,
-          expectedHeadSha: remote?.headSha,
-          kind: targetKind,
-          slug: normalizedSlug,
-          body,
-          frontMatter: {
-            ...frontMatter,
-            slug: normalizedSlug,
-            draft: targetKind === "draft",
-          },
-          force,
-        }),
+      let stagedCount = 0;
+      if (referencedMedia.length) {
+        setMessage(`正在准备并暂存 ${referencedMedia.length} 张图片…`);
+      }
+      const stagedMedia = await mapWithConcurrency(
+        referencedMedia,
+        3,
+        async (media) => {
+          const staged = await stagePendingMedia(media);
+          stagedCount += 1;
+          if (mountedRef.current) {
+            setMessage(
+              `图片暂存中：${stagedCount}/${referencedMedia.length}。全部完成后才会提交文章。`,
+            );
+          }
+          return staged;
+        },
       );
-      form.set(
-        "manifest",
-        JSON.stringify(
-          referencedMedia.map(({ id, name, contentType, alt }) => ({
-            id,
-            name,
-            contentType,
-            alt,
-          })),
+      const referencedById = new Map(
+        referencedMedia.map((media) => [media.id, media]),
+      );
+      setStagedAssetUrls(
+        Object.fromEntries(
+          stagedMedia.flatMap((staged) => {
+            const source = referencedById.get(staged.id);
+            if (!source?.previewUrl) return [];
+            return [
+              [source.name, source.previewUrl],
+              [staged.preparedName, source.previewUrl],
+            ];
+          }),
         ),
       );
-      referencedMedia.forEach((media) => {
-        form.append(`media:${media.id}`, media.blob, media.name);
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
       });
       const response = await fetch("/api/posts/bundle", {
         method: "POST",
-        body: form,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          post: {
+            currentPath: remote?.path,
+            expectedSha: remote?.sha,
+            expectedHeadSha: remote?.headSha,
+            kind: targetKind,
+            slug: normalizedSlug,
+            body,
+            frontMatter: {
+              ...frontMatter,
+              slug: normalizedSlug,
+              draft: targetKind === "draft",
+            },
+            force,
+          },
+          mediaReceipts: stagedMedia.map((media) => media.receipt),
+        }),
       });
       if (!mountedRef.current) return;
       if (!response.ok) {
@@ -817,6 +926,10 @@ export function ArticleEditor({
       const result = payload.data as PostBundleMutationResult;
       const id = encodePath(result.path);
       const editedWhileSaving = editRevisionRef.current !== submittedRevision;
+      const submittedMediaIds = new Set(
+        referencedMedia.map((media) => media.id),
+      );
+      const unreferencedMediaCount = pendingMedia.length - referencedMedia.length;
       setRemote({
         id,
         path: result.path,
@@ -825,17 +938,12 @@ export function ArticleEditor({
       });
       let successMessage: string;
       if (editedWhileSaving) {
-        const submittedMediaIds = new Set(
-          referencedMedia.map((media) => media.id),
-        );
         setBody((current) =>
-          replaceUploadedMediaNames(current, result.mediaNameMap),
-        );
-        referencedMedia.forEach((media) => {
-          if (media.previewUrl) URL.revokeObjectURL(media.previewUrl);
-        });
-        setPendingMedia((current) =>
-          current.filter((media) => !submittedMediaIds.has(media.id)),
+          replaceUploadedMediaNames(
+            current,
+            referencedMedia,
+            result.mediaNamesById,
+          ),
         );
         setFrontMatter((current) => ({
           ...current,
@@ -846,45 +954,63 @@ export function ArticleEditor({
         setSaveState("local-saving");
         successMessage =
           "发起保存时的版本已提交；保存期间的新修改仍保留在本地，请再次保存。";
+        if (unreferencedMediaCount) {
+          successMessage += ` ${unreferencedMediaCount} 张未被提交的图片仍在本地恢复副本中。`;
+        }
       } else {
         setBody(result.body);
-        pendingMedia.forEach((media) => {
-          if (media.previewUrl) URL.revokeObjectURL(media.previewUrl);
-        });
-        setPendingMedia([]);
         setFrontMatter((current) => ({
           ...current,
           slug: normalizedSlug,
           draft: targetKind === "draft",
           updated: formatBlogTimestamp(new Date(), blogTimezone),
         }));
-        setDirty(false);
-        recoverySnapshotRef.current = undefined;
-        setSaveState("remote-saved");
         successMessage =
           payload.warning ||
           (targetKind === "draft"
             ? "正文与图片已在同一个 Git Commit 中保存为草稿。"
             : "正文与图片已原子提交，部署流程将由工作流处理。");
-        try {
-          await del(recoveryKey);
-        } catch {
-          successMessage += " 本地恢复副本未能清除，但远程保存已成功。";
+        if (unreferencedMediaCount) {
+          setDirty(true);
+          setSaveState("local-saving");
+          successMessage += ` ${unreferencedMediaCount} 张未被正文引用的图片仍保留在本地恢复副本中。`;
+        } else {
+          setDirty(false);
+          recoverySnapshotRef.current = undefined;
+          setSaveState("remote-saved");
+          try {
+            await del(recoveryKey);
+          } catch {
+            successMessage += " 本地恢复副本未能清除，但远程保存已成功。";
+          }
         }
       }
       setMessage(successMessage);
       if (!initial || initial.path !== result.path) {
         const search = new URLSearchParams({ returnTo });
         const editorUrl = `/posts/${id}/edit?${search}`;
-        if (editedWhileSaving) {
+        if (editedWhileSaving || unreferencedMediaCount) {
           window.history.replaceState(window.history.state, "", editorUrl);
         } else {
+          window.sessionStorage.setItem(EDITOR_FLASH_KEY, successMessage);
           router.replace(editorUrl);
         }
       }
       if (!editedWhileSaving) router.refresh();
+      window.setTimeout(() => {
+        referencedMedia.forEach((media) => {
+          if (media.previewUrl) URL.revokeObjectURL(media.previewUrl);
+        });
+        if (mountedRef.current) {
+          setPendingMedia((current) =>
+            current.filter((media) => !submittedMediaIds.has(media.id)),
+          );
+          setStagedAssetUrls({});
+        }
+      }, 1_500);
     } catch (error) {
       if (!mountedRef.current) return;
+      setStagedAssetUrls({});
       setSaveState("error");
       setMessage(
         `${error instanceof Error ? error.message : "保存失败，请稍后重试。"} 本地图片与恢复副本已保留，可直接重试。`,

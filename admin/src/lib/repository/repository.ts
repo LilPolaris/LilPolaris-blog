@@ -9,6 +9,8 @@ import type {
   PostMutationInput,
   PostSummary,
   RenameTaxonomyInput,
+  StagePostMediaInput,
+  StagedPostMedia,
   TaxonomyMutationResult,
   WorkflowRun,
 } from "@/lib/types";
@@ -18,6 +20,7 @@ export interface RepositoryAdapter {
   listPosts(kind?: PostKind): Promise<PostSummary[]>;
   getPost(path: string): Promise<PostDocument>;
   savePost(input: PostMutationInput): Promise<MutationResult>;
+  stagePostMedia(input: StagePostMediaInput): Promise<StagedPostMedia>;
   savePostBundle(
     input: PostBundleMutationInput,
   ): Promise<PostBundleMutationResult>;

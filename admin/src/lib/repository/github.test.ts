@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { GitHubRepositoryAdapter } from "@/lib/repository/github";
-import type { RepositoryConfig } from "@/lib/types";
+import type {
+  PostBundleMutationInput,
+  RepositoryConfig,
+} from "@/lib/types";
 
 function config(repo: string): RepositoryConfig {
   return {
@@ -224,4 +227,190 @@ describe("GitHubRepositoryAdapter reads", () => {
     expect(fixture.rest.git.getTree).not.toHaveBeenCalled();
     expect(fixture.rest.git.getBlob).not.toHaveBeenCalled();
   });
+});
+
+function bundleInput(
+  blobSha = "a".repeat(40),
+): PostBundleMutationInput {
+  return {
+    kind: "draft",
+    slug: "atomic-post",
+    body: '{% asset_img "before.png" "截图" %}',
+    frontMatter: {
+      title: "原子提交",
+      date: "",
+      firstPublishedAt: "",
+      updated: "2026-08-30 10:00:00",
+      slug: "atomic-post",
+      tags: [],
+      categories: [],
+      excerpt: "",
+      cover: "",
+      draft: true,
+      layout: "post",
+      permalink: "",
+    },
+    media: [
+      {
+        id: "pending-1",
+        referenceName: "before.png",
+        preparedName: "20260830-before-abcdef.png",
+        contentType: "image/png",
+        size: 8,
+        blobSha,
+      },
+    ],
+  };
+}
+
+function writeFixture(failAt?: "blob" | "tree" | "commit" | "ref") {
+  let publishedHead = "head-sha";
+  const createTree = vi.fn(async () => {
+    if (failAt === "tree") throw new Error("tree failed");
+    return { data: { sha: "new-tree-sha", tree: [] } };
+  });
+  const createCommit = vi.fn(async () => {
+    if (failAt === "commit") throw new Error("commit failed");
+    return { data: { sha: "new-commit-sha" } };
+  });
+  const updateRef = vi.fn(async ({ sha }: { sha: string }) => {
+    if (failAt === "ref") throw new Error("ref failed");
+    publishedHead = sha;
+    return { data: {} };
+  });
+  const createBlob = vi.fn(async () => {
+    if (failAt === "blob") throw new Error("blob failed");
+    return { data: { sha: "b".repeat(40) } };
+  });
+  return {
+    get publishedHead() {
+      return publishedHead;
+    },
+    rest: {
+      git: {
+        getRef: vi.fn(async () => ({ data: { object: { sha: "head-sha" } } })),
+        getCommit: vi.fn(async () => ({ data: { tree: { sha: "tree-sha" } } })),
+        getTree: vi.fn(async () => ({
+          data: { truncated: false, tree: [] },
+        })),
+        getBlob: vi.fn(),
+        createBlob,
+        createTree,
+        createCommit,
+        updateRef,
+      },
+    },
+  };
+}
+
+describe("GitHubRepositoryAdapter staged writes", () => {
+  it("stages an image with createBlob only", async () => {
+    const createBlob = vi.fn(async () => ({ data: { sha: "a".repeat(40) } }));
+    const octokit = { rest: { git: { createBlob } } };
+    const adapter = new GitHubRepositoryAdapter(config("stage-only"), "token");
+    attachOctokit(adapter, octokit);
+
+    await expect(
+      adapter.stagePostMedia({
+        id: "pending-1",
+        referenceName: "before.png",
+        preparedName: "20260830-before-abcdef.png",
+        contentType: "image/png",
+        bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+      }),
+    ).resolves.toMatchObject({
+      id: "pending-1",
+      blobSha: "a".repeat(40),
+      size: 8,
+    });
+    expect(createBlob).toHaveBeenCalledTimes(1);
+    expect(Object.keys(octokit.rest.git)).toEqual(["createBlob"]);
+  });
+
+  it("does not attempt a commit when staging createBlob fails", async () => {
+    const createBlob = vi.fn(async () => {
+      throw new Error("stage failed");
+    });
+    const octokit = { rest: { git: { createBlob } } };
+    const adapter = new GitHubRepositoryAdapter(config("stage-failure"), "token");
+    attachOctokit(adapter, octokit);
+
+    await expect(
+      adapter.stagePostMedia({
+        id: "pending-1",
+        referenceName: "before.png",
+        preparedName: "20260830-before-abcdef.png",
+        contentType: "image/png",
+        bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+      }),
+    ).rejects.toThrow("stage failed");
+    expect(createBlob).toHaveBeenCalledTimes(1);
+    expect(Object.keys(octokit.rest.git)).toEqual(["createBlob"]);
+  });
+
+  it("finalizes Markdown and staged images with one tree, commit, and ref update", async () => {
+    const fixture = writeFixture();
+    fixture.rest.git.createBlob
+      .mockResolvedValueOnce({ data: { sha: "a".repeat(40) } })
+      .mockResolvedValueOnce({ data: { sha: "b".repeat(40) } });
+    const adapter = new GitHubRepositoryAdapter(config("atomic-success"), "token");
+    attachOctokit(adapter, fixture);
+
+    const staged = await adapter.stagePostMedia({
+      id: "pending-1",
+      referenceName: "before.png",
+      preparedName: "20260830-before-abcdef.png",
+      contentType: "image/png",
+      bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    });
+    expect(fixture.rest.git.createBlob).toHaveBeenCalledTimes(1);
+    const input = bundleInput(staged.blobSha);
+    input.media = [staged];
+    const result = await adapter.savePostBundle(input);
+
+    expect(fixture.rest.git.createBlob).toHaveBeenCalledTimes(2);
+    expect(fixture.rest.git.createTree).toHaveBeenCalledTimes(1);
+    expect(fixture.rest.git.createCommit).toHaveBeenCalledTimes(1);
+    expect(fixture.rest.git.updateRef).toHaveBeenCalledTimes(1);
+    expect(fixture.rest.git.createTree).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tree: expect.arrayContaining([
+          expect.objectContaining({
+            path: "source/_drafts/atomic-post/20260830-before-abcdef.png",
+            sha: "a".repeat(40),
+          }),
+        ]),
+      }),
+    );
+    expect(fixture.publishedHead).toBe("new-commit-sha");
+    expect(result.mediaNamesById).toEqual({
+      "pending-1": "20260830-before-abcdef.png",
+    });
+  });
+
+  it.each(["blob", "tree", "commit", "ref"] as const)(
+    "does not move the branch when %s creation fails",
+    async (failAt) => {
+      const fixture = writeFixture(failAt);
+      const adapter = new GitHubRepositoryAdapter(
+        config(`atomic-failure-${failAt}`),
+        "token",
+      );
+      attachOctokit(adapter, fixture);
+
+      await expect(adapter.savePostBundle(bundleInput())).rejects.toThrow(
+        `${failAt} failed`,
+      );
+      expect(fixture.publishedHead).toBe("head-sha");
+      expect(fixture.rest.git.createTree).toHaveBeenCalledTimes(
+        failAt === "blob" ? 0 : 1,
+      );
+      expect(fixture.rest.git.createCommit).toHaveBeenCalledTimes(
+        failAt === "blob" || failAt === "tree" ? 0 : 1,
+      );
+      expect(fixture.rest.git.updateRef).toHaveBeenCalledTimes(
+        failAt === "ref" ? 1 : 0,
+      );
+    },
+  );
 });

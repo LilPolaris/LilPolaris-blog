@@ -29,6 +29,19 @@ export class AppError extends Error {
   }
 }
 
+type ErrorResponseOptions = {
+  requestId?: string;
+  operation?: string;
+};
+
+function validRequestId(value?: string) {
+  return Boolean(value && /^[a-zA-Z0-9_-]{8,100}$/.test(value));
+}
+
+export function createRequestId(value?: string) {
+  return validRequestId(value) ? value! : crypto.randomUUID();
+}
+
 export function toAppError(error: unknown): AppError {
   if (error instanceof AppError) return error;
   if (error instanceof ZodError) {
@@ -84,16 +97,35 @@ export function toAppError(error: unknown): AppError {
   );
 }
 
-export function errorResponse(error: unknown) {
+export function errorResponse(
+  error: unknown,
+  options: ErrorResponseOptions = {},
+) {
   const appError = toAppError(error);
+  const requestId = createRequestId(options.requestId);
+  console.error(
+    JSON.stringify({
+      level: "error",
+      event: "api.error",
+      requestId,
+      operation: options.operation || "unknown",
+      code: appError.code,
+      status: appError.status,
+      message: appError.message,
+    }),
+  );
   return Response.json(
     {
       error: {
         code: appError.code,
         message: appError.message,
         details: appError.details,
+        requestId,
       },
     },
-    { status: appError.status },
+    {
+      status: appError.status,
+      headers: { "x-request-id": requestId },
+    },
   );
 }

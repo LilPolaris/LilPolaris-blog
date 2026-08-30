@@ -1,6 +1,17 @@
 import { createHash } from "node:crypto";
 import { AppError } from "@/lib/errors";
 import {
+  STAGED_IMAGE_MAX_BYTES,
+  validateStagedImageBytes,
+} from "@/lib/image-upload";
+import {
+  assertPreparedMediaName,
+  prepareOrReuseMediaFileName,
+  replaceAssetImageReference,
+  uniqueMediaName,
+  validateImageFileExtension,
+} from "@/lib/media-name";
+import {
   renameTaxonomyInSource,
   serializeMarkdown,
 } from "@/lib/front-matter";
@@ -27,6 +38,8 @@ import type {
   PostSummary,
   RenameTaxonomyInput,
   RepositoryConfig,
+  StagePostMediaInput,
+  StagedPostMedia,
   TaxonomyMutationResult,
   WorkflowRun,
 } from "@/lib/types";
@@ -63,29 +76,9 @@ function contentType(path: string) {
   );
 }
 
-function validImage(bytes: Uint8Array, name: string) {
-  const type = contentType(name);
-  const text = (start: number, length: number) =>
-    String.fromCharCode(...bytes.slice(start, start + length));
-  return (
-    (type === "image/jpeg" &&
-      bytes[0] === 0xff &&
-      bytes[1] === 0xd8 &&
-      bytes[2] === 0xff) ||
-    (type === "image/png" && bytes[0] === 0x89 && text(1, 3) === "PNG") ||
-    (type === "image/gif" &&
-      (text(0, 6) === "GIF87a" || text(0, 6) === "GIF89a")) ||
-    (type === "image/webp" &&
-      text(0, 4) === "RIFF" &&
-      text(8, 4) === "WEBP") ||
-    (type === "image/avif" &&
-      text(4, 4) === "ftyp" &&
-      ["avif", "avis"].includes(text(8, 4)))
-  );
-}
-
 export class MockRepositoryAdapter implements RepositoryAdapter {
   private readonly files = new Map<string, MockFile>();
+  private readonly stagedBlobs = new Map<string, MockFile>();
   private headSha = sha("initial");
   private dispatchedWorkflow?: {
     commitSha: string;
@@ -265,6 +258,37 @@ categories:
     };
   }
 
+  async stagePostMedia(input: StagePostMediaInput): Promise<StagedPostMedia> {
+    if (
+      !input.id ||
+      input.id.length > 100 ||
+      !input.referenceName ||
+      input.referenceName.length > 200
+    ) {
+      throw new AppError("VALIDATION", "图片暂存信息不合法。", 400);
+    }
+    assertPreparedMediaName(input.preparedName);
+    validateStagedImageBytes(
+      input.bytes,
+      input.preparedName,
+      input.contentType,
+    );
+    const blobSha = sha(input.bytes);
+    this.stagedBlobs.set(blobSha, {
+      bytes: input.bytes,
+      sha: blobSha,
+      updatedAt: new Date().toISOString(),
+    });
+    return {
+      id: input.id,
+      referenceName: input.referenceName,
+      preparedName: input.preparedName,
+      contentType: input.contentType,
+      size: input.bytes.byteLength,
+      blobSha,
+    };
+  }
+
   async savePostBundle(
     input: PostBundleMutationInput,
   ): Promise<PostBundleMutationResult> {
@@ -273,24 +297,30 @@ categories:
         ...(await this.savePost(input)),
         body: input.body,
         uploadedMedia: [],
-        mediaNameMap: {},
+        mediaNamesById: {},
       };
     }
     const snapshot = new Map(this.files);
     const snapshotHead = this.headSha;
-    const totalBytes = input.media.reduce(
-      (total, media) => total + media.bytes.byteLength,
-      0,
-    );
+    const totalBytes = input.media.reduce((total, media) => total + media.size, 0);
     if (totalBytes > 32 * 1024 * 1024) {
       throw new AppError(
         "UPLOAD_INVALID",
-        "一篇文章待上传图片总量不能超过 32 MiB。",
+        "一篇文章的暂存图片总量不能超过 32 MiB。",
         413,
       );
     }
 
     try {
+      if (
+        input.expectedHeadSha &&
+        input.expectedHeadSha !== this.headSha &&
+        !input.force
+      ) {
+        throw new AppError("CONFLICT", "远程仓库已发生变化。", 409, {
+          remoteHeadSha: this.headSha,
+        });
+      }
       const targetPath = postPath(
         this.config,
         input.kind,
@@ -309,78 +339,74 @@ categories:
           )
           .map((path) => path.split("/").at(-1)!),
       );
-      const mediaNameMap: Record<string, string> = {};
+      const mediaNamesById: Record<string, string> = {};
+      const seenIds = new Set<string>();
       let finalBody = input.body;
       const prepared = input.media.map((media) => {
-        const safeName = media.name
-          .normalize("NFKC")
-          .replace(/\s+/g, "-")
-          .replace(/[^a-zA-Z0-9._-]/g, "")
-          .replace(/^\.+/, "");
-        if (
-          media.bytes.byteLength >
-          Math.min(this.config.uploadLimitMb, 8) * 1024 * 1024
-        ) {
+        if (seenIds.has(media.id)) {
+          throw new AppError("VALIDATION", "图片暂存凭证包含重复项目。", 400);
+        }
+        seenIds.add(media.id);
+        if (media.size <= 0 || media.size > STAGED_IMAGE_MAX_BYTES) {
           throw new AppError(
             "UPLOAD_INVALID",
-            "单张图片不能超过 8 MiB。",
+            "准备后的单张图片不能超过 3.5 MiB。",
             413,
           );
         }
-        if (
-          !safeName ||
-          contentType(safeName) === "application/octet-stream" ||
-          (media.contentType !== contentType(safeName) &&
-            media.contentType !== "application/octet-stream") ||
-          !validImage(media.bytes, safeName)
-        ) {
+        assertPreparedMediaName(media.preparedName);
+        validateImageFileExtension(media.preparedName, media.contentType);
+        const staged = this.stagedBlobs.get(media.blobSha);
+        if (!staged || staged.bytes.byteLength !== media.size) {
           throw new AppError(
-            "UPLOAD_INVALID",
-            "文件内容不是有效图片。",
+            "VALIDATION",
+            "图片暂存 Blob 不存在或已失效。",
             400,
           );
         }
-        const dot = safeName.lastIndexOf(".");
-        const stem = safeName.slice(0, dot);
-        const extension = safeName.slice(dot);
-        let name = safeName;
-        let suffix = 2;
-        while (reserved.has(name)) {
-          name = `${stem}-${suffix}${extension}`;
-          suffix += 1;
-        }
+        const name = uniqueMediaName(media.preparedName, reserved);
         reserved.add(name);
-        mediaNameMap[media.id] = name;
-        if (name !== media.name) {
-          finalBody = finalBody.replaceAll(
-            `{% asset_img "${media.name}"`,
-            `{% asset_img "${name}"`,
-          );
-        }
-        return { ...media, name };
+        mediaNamesById[media.id] = name;
+        finalBody = replaceAssetImageReference(
+          finalBody,
+          media.referenceName,
+          name,
+        );
+        return { ...media, name, staged };
       });
       const result = await this.savePost({ ...input, body: finalBody });
       const uploadedMedia: MediaAsset[] = [];
       for (const media of prepared) {
-        uploadedMedia.push(
-          await this.uploadMedia({
-            bytes: media.bytes,
-            name: media.name,
-            contentType: media.contentType,
-            postPath: result.path,
-          }),
-        );
+        const path = `${assetDirectoryFromPostPath(result.path)}/${media.name}`;
+        this.files.set(path, {
+          bytes: media.staged.bytes,
+          sha: media.blobSha,
+          updatedAt: new Date().toISOString(),
+        });
+        uploadedMedia.push({
+          id: Buffer.from(path, "utf8").toString("base64url"),
+          path,
+          name: media.name,
+          sha: media.blobSha,
+          size: media.size,
+          scope: "post",
+          postSlug: input.slug,
+          uploadedAt: new Date().toISOString(),
+          downloadUrl: `/api/media/content?path=${encodeURIComponent(path)}`,
+        });
       }
       this.headSha = snapshotHead;
-      const commitSha = this.bump(
-        `content: ${input.kind === "draft" ? "save draft bundle" : "publish bundle"} ${input.slug}`,
-      );
+      const message = `content: ${
+        input.kind === "draft" ? "save draft bundle" : "publish bundle"
+      } ${input.slug}`;
+      const commitSha = this.bump(message);
       return {
         ...result,
         headSha: commitSha,
         commitSha,
+        message,
         body: finalBody,
-        mediaNameMap,
+        mediaNamesById,
         uploadedMedia,
       };
     } catch (error) {
@@ -520,33 +546,21 @@ categories:
     contentType: string;
     postPath?: string;
   }): Promise<MediaAsset> {
-    if (input.bytes.byteLength > this.config.uploadLimitMb * 1024 * 1024) {
-      throw new AppError(
-        "UPLOAD_INVALID",
-        `文件不能超过 ${this.config.uploadLimitMb} MiB。`,
-        413,
-      );
-    }
-    const safeName = input.name
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9._-]/g, "");
-    if (!safeName || contentType(safeName) === "application/octet-stream") {
-      throw new AppError("UPLOAD_INVALID", "不支持这种图片格式。", 400);
-    }
-    if (!validImage(input.bytes, safeName)) {
-      throw new AppError("UPLOAD_INVALID", "文件内容不是有效图片。", 400);
-    }
+    const safeName = prepareOrReuseMediaFileName({
+      originalName: input.name,
+      uploadedFileName: input.name,
+      contentType: input.contentType,
+    });
+    validateStagedImageBytes(input.bytes, safeName, input.contentType);
     const directory = input.postPath
       ? assetDirectoryFromPostPath(input.postPath)
       : this.config.imagesPath;
-    const extension = `.${safeName.split(".").at(-1)}`;
-    const stem = safeName.slice(0, -extension.length);
-    let name = safeName;
-    let index = 2;
-    while (this.files.has(`${directory}/${name}`)) {
-      name = `${stem}-${index}${extension}`;
-      index += 1;
-    }
+    const name = uniqueMediaName(
+      safeName,
+      [...this.files.keys()]
+        .filter((path) => path.startsWith(`${directory}/`))
+        .map((path) => path.split("/").at(-1)!),
+    );
     const path = `${directory}/${name}`;
     const file: MockFile = {
       bytes: input.bytes,
