@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke:editor": "node scripts/smoke-editor.mjs"
+    "smoke:editor": "node scripts/smoke-editor.mjs",
+    "smoke:upload": "node scripts/smoke-upload.mjs"
   },
   "dependencies": {
     "@emnapi/runtime": "^1.11.3",

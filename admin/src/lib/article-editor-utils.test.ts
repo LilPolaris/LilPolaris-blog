@@ -24,11 +24,18 @@ describe("article editor helpers", () => {
 
   it("reconciles uploaded media names without discarding later edits", () => {
     const latest =
-      '{% asset_img "pending.png" "说明" %}\n\n保存期间继续写的内容';
+      '{% asset_img "pending.png" "说明" %}\n{% asset_img \'second.png\' \'说明\' %}\n\n保存期间继续写的内容';
     expect(
-      replaceUploadedMediaNames(latest, { "pending.png": "pending-2.png" }),
+      replaceUploadedMediaNames(
+        latest,
+        [
+          { id: "one", name: "pending.png" },
+          { id: "two", name: "second.png" },
+        ],
+        { one: "pending-2.png", two: "second-2.png" },
+      ),
     ).toBe(
-      '{% asset_img "pending-2.png" "说明" %}\n\n保存期间继续写的内容',
+      '{% asset_img "pending-2.png" "说明" %}\n{% asset_img \'second-2.png\' \'说明\' %}\n\n保存期间继续写的内容',
     );
   });
 

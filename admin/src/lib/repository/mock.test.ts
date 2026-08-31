@@ -112,10 +112,12 @@ describe("MockRepositoryAdapter", () => {
     const repository = new MockRepositoryAdapter(config);
     const media = await repository.uploadMedia({
       bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
-      name: "cover.png",
+      name: "封面.png",
       contentType: "image/png",
     });
-    expect(media.path).toBe("source/img/cover.png");
+    expect(media.path).toMatch(
+      /^source\/img\/\d{8}-image-[0-9a-f]{6}\.png$/,
+    );
     expect(await repository.listMedia()).toHaveLength(1);
     await repository.deleteMedia(media.path, media.sha);
     expect(await repository.listMedia()).toHaveLength(0);
@@ -140,6 +142,14 @@ describe("MockRepositoryAdapter", () => {
     );
     const image = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
     const body = `${source.body}\n{% asset_img "paste.png" "截图" %}`;
+    const staged = await repository.stagePostMedia({
+      id: "pending-1",
+      referenceName: "paste.png",
+      preparedName: "20260830-paste-abcdef.png",
+      contentType: "image/png",
+      bytes: image,
+    });
+    expect(await repository.listMedia()).toHaveLength(0);
     const result = await repository.savePostBundle({
       currentPath: source.path,
       expectedSha: source.sha,
@@ -148,19 +158,16 @@ describe("MockRepositoryAdapter", () => {
       slug: source.slug,
       body,
       frontMatter: source.frontMatter,
-      media: [
-        {
-          id: "pending-1",
-          name: "paste.png",
-          contentType: "image/png",
-          bytes: image,
-          alt: "截图",
-        },
-      ],
+      media: [staged],
     });
-    expect(result.body).toBe(body);
+    expect(result.body).toContain(
+      '{% asset_img "20260830-paste-abcdef.png" "截图" %}',
+    );
+    expect(result.mediaNamesById).toEqual({
+      "pending-1": "20260830-paste-abcdef.png",
+    });
     expect(result.uploadedMedia[0].path).toBe(
-      "source/_drafts/next-article/paste.png",
+      "source/_drafts/next-article/20260830-paste-abcdef.png",
     );
     expect((await repository.getPost(result.path)).body).toContain(
       "asset_img",
@@ -168,7 +175,7 @@ describe("MockRepositoryAdapter", () => {
     expect(result.commitSha).toBe(result.headSha);
   });
 
-  it("rolls back the entire bundle when one image is invalid", async () => {
+  it("rolls back the entire bundle when a staged blob is missing", async () => {
     const repository = new MockRepositoryAdapter(config);
     const beforeMedia = await repository.listMedia();
     await expect(
@@ -193,14 +200,15 @@ describe("MockRepositoryAdapter", () => {
         media: [
           {
             id: "bad",
-            name: "bad.png",
+            referenceName: "bad.png",
+            preparedName: "20260830-bad-abcdef.png",
             contentType: "image/png",
-            bytes: new Uint8Array([1, 2, 3]),
-            alt: "坏图片",
+            size: 8,
+            blobSha: "f".repeat(40),
           },
         ],
       }),
-    ).rejects.toMatchObject({ code: "UPLOAD_INVALID" });
+    ).rejects.toMatchObject({ code: "VALIDATION" });
     await expect(
       repository.getPost("source/_drafts/atomic-failure.md"),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -209,12 +217,13 @@ describe("MockRepositoryAdapter", () => {
 
   it("rejects pending image bundles larger than 32 MiB", async () => {
     const repository = new MockRepositoryAdapter(config);
-    const media = Array.from({ length: 5 }, (_, index) => ({
+    const media = Array.from({ length: 10 }, (_, index) => ({
       id: `large-${index}`,
-      name: `large-${index}.png`,
+      referenceName: `large-${index}.png`,
+      preparedName: `20260830-large-${index}-${index.toString(16).padStart(6, "0")}.png`,
       contentType: "image/png",
-      bytes: new Uint8Array(7 * 1024 * 1024),
-      alt: "大图",
+      size: Math.floor(3.5 * 1024 * 1024),
+      blobSha: index.toString(16).padStart(40, "0"),
     }));
     await expect(
       repository.savePostBundle({

@@ -1,59 +1,43 @@
 import { requireAdminApi } from "@/lib/auth-guard";
 import { AppError, errorResponse } from "@/lib/errors";
-import { normalizeImageBytes } from "@/lib/image-upload";
+import {
+  beginApiRequest,
+  jsonWithRequestId,
+  logApiEvent,
+} from "@/lib/observability";
 import { getRepository } from "@/lib/repository";
 import { getEffectiveRepositoryConfig } from "@/lib/settings";
-import { bundleManifestSchema, postMutationSchema } from "@/lib/validation";
+import {
+  stagedMediaSigningSecret,
+  verifyStagedMediaReceipts,
+} from "@/lib/staged-media";
+import { postBundleRequestSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const context = beginApiRequest(request, "post.bundle.save");
   try {
     await requireAdminApi();
-    const form = await request.formData();
-    const payloadValue = form.get("payload");
-    const manifestValue = form.get("manifest");
-    if (typeof payloadValue !== "string" || typeof manifestValue !== "string") {
-      throw new AppError(
-        "VALIDATION",
-        "缺少文章数据或图片清单。",
-        400,
-      );
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      throw new AppError("VALIDATION", "请求正文必须是有效的 JSON。", 400);
     }
-    const input = postMutationSchema.parse(JSON.parse(payloadValue));
-    const manifest = bundleManifestSchema.parse(JSON.parse(manifestValue));
-    const seen = new Set<string>();
-    const media = await Promise.all(
-      manifest.map(async (entry) => {
-        if (seen.has(entry.id)) {
-          throw new AppError("VALIDATION", "图片清单包含重复项目。", 400);
-        }
-        seen.add(entry.id);
-        const value = form.get(`media:${entry.id}`);
-        if (!(value instanceof File)) {
-          throw new AppError(
-            "VALIDATION",
-            `缺少待上传图片 ${entry.name}。`,
-            400,
-          );
-        }
-        if (value.type && value.type !== entry.contentType) {
-          throw new AppError(
-            "UPLOAD_INVALID",
-            `图片 ${entry.name} 的 MIME 类型不一致。`,
-            400,
-          );
-        }
-        const bytes = new Uint8Array(await value.arrayBuffer());
-        return {
-          ...entry,
-          bytes: await normalizeImageBytes(bytes, entry.contentType),
-        };
-      }),
+    const input = postBundleRequestSchema.parse(body);
+    const config = await getEffectiveRepositoryConfig();
+    const media = verifyStagedMediaReceipts(
+      input.mediaReceipts,
+      {
+        owner: config.owner,
+        repo: config.repo,
+        branch: config.branch,
+      },
+      stagedMediaSigningSecret(),
     );
     const repository = await getRepository();
-    const result = await repository.savePostBundle({ ...input, media });
-    const config = await getEffectiveRepositoryConfig();
+    const result = await repository.savePostBundle({ ...input.post, media });
     let deploymentWarning: string | undefined;
     if (config.autoDispatch) {
       try {
@@ -62,11 +46,17 @@ export async function POST(request: Request) {
         deploymentWarning = "内容已保存，但额外触发部署失败，请到部署记录重试。";
       }
     }
-    return Response.json(
+    logApiEvent(context, "api.request.succeeded", {
+      kind: input.post.kind,
+      mediaCount: media.length,
+      mediaBytes: media.reduce((sum, item) => sum + item.size, 0),
+    });
+    return jsonWithRequestId(
+      context,
       { data: result, warning: deploymentWarning },
-      { status: input.currentPath ? 200 : 201 },
+      { status: input.post.currentPath ? 200 : 201 },
     );
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, context);
   }
 }

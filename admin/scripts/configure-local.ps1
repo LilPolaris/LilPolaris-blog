@@ -45,6 +45,7 @@ $lines = @(
   "ADMIN_GITHUB_LOGIN=LilPolaris",
   "AUTH_MODE=local-cli",
   "AUTH_SECRET=$authSecret",
+  "CONTENT_WRITE_POLICY=",
   "",
   "DEFAULT_LAYOUT=post",
   "DEFAULT_CATEGORY=",

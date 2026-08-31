@@ -1,6 +1,17 @@
 import { Octokit } from "@octokit/rest";
 import { AppError } from "@/lib/errors";
 import {
+  STAGED_IMAGE_MAX_BYTES,
+  validateStagedImageBytes,
+} from "@/lib/image-upload";
+import {
+  assertPreparedMediaName,
+  prepareOrReuseMediaFileName,
+  replaceAssetImageReference,
+  uniqueMediaName,
+  validateImageFileExtension,
+} from "@/lib/media-name";
+import {
   renameTaxonomyInSource,
   serializeMarkdown,
 } from "@/lib/front-matter";
@@ -27,6 +38,8 @@ import type {
   PostSummary,
   RenameTaxonomyInput,
   RepositoryConfig,
+  StagePostMediaInput,
+  StagedPostMedia,
   TaxonomyMutationResult,
   WorkflowRun,
 } from "@/lib/types";
@@ -229,69 +242,6 @@ function mediaDownloadUrl(path: string, sha?: string) {
 
 function imageContentType(path: string) {
   return IMAGE_TYPES[path.split(".").at(-1)?.toLowerCase() || ""] || "application/octet-stream";
-}
-
-function ascii(bytes: Uint8Array, start: number, length: number) {
-  return String.fromCharCode(...bytes.slice(start, start + length));
-}
-
-function validateImageBytes(
-  bytes: Uint8Array,
-  name: string,
-  reportedContentType: string,
-) {
-  const expected = imageContentType(name);
-  if (
-    reportedContentType &&
-    reportedContentType !== expected &&
-    reportedContentType !== "application/octet-stream"
-  ) {
-    throw new AppError(
-      "UPLOAD_INVALID",
-      "文件扩展名与浏览器报告的图片类型不一致。",
-      400,
-    );
-  }
-  const valid =
-    (expected === "image/jpeg" &&
-      bytes[0] === 0xff &&
-      bytes[1] === 0xd8 &&
-      bytes[2] === 0xff) ||
-    (expected === "image/png" &&
-      bytes[0] === 0x89 &&
-      ascii(bytes, 1, 3) === "PNG") ||
-    (expected === "image/gif" &&
-      (ascii(bytes, 0, 6) === "GIF87a" || ascii(bytes, 0, 6) === "GIF89a")) ||
-    (expected === "image/webp" &&
-      ascii(bytes, 0, 4) === "RIFF" &&
-      ascii(bytes, 8, 4) === "WEBP") ||
-    (expected === "image/avif" &&
-      ascii(bytes, 4, 4) === "ftyp" &&
-      ["avif", "avis"].includes(ascii(bytes, 8, 4)));
-  if (!valid) {
-    throw new AppError(
-      "UPLOAD_INVALID",
-      "文件内容不是有效的受支持图片，上传已拒绝。",
-      400,
-    );
-  }
-}
-
-function cleanFileName(name: string) {
-  const normalized = name
-    .normalize("NFKC")
-    .replace(/\s+/g, "-")
-    .replace(/[^a-zA-Z0-9._-]/g, "")
-    .replace(/^\.+/, "");
-  const extension = normalized.split(".").at(-1)?.toLowerCase() || "";
-  if (!normalized || !IMAGE_TYPES[extension]) {
-    throw new AppError(
-      "UPLOAD_INVALID",
-      "仅支持 JPG、PNG、GIF、WebP 和 AVIF 图片。",
-      400,
-    );
-  }
-  return normalized;
 }
 
 export class GitHubRepositoryAdapter implements RepositoryAdapter {
@@ -682,6 +632,36 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
     };
   }
 
+  async stagePostMedia(input: StagePostMediaInput): Promise<StagedPostMedia> {
+    if (
+      !input.id ||
+      input.id.length > 100 ||
+      !input.referenceName ||
+      input.referenceName.length > 200
+    ) {
+      throw new AppError("VALIDATION", "图片暂存信息不合法。", 400);
+    }
+    assertPreparedMediaName(input.preparedName);
+    validateStagedImageBytes(
+      input.bytes,
+      input.preparedName,
+      input.contentType,
+    );
+    const blob = await this.octokit.rest.git.createBlob({
+      ...this.args(),
+      content: encodeBase64(input.bytes),
+      encoding: "base64",
+    });
+    return {
+      id: input.id,
+      referenceName: input.referenceName,
+      preparedName: input.preparedName,
+      contentType: input.contentType,
+      size: input.bytes.byteLength,
+      blobSha: blob.data.sha,
+    };
+  }
+
   async savePostBundle(
     input: PostBundleMutationInput,
   ): Promise<PostBundleMutationResult> {
@@ -690,7 +670,7 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
         ...(await this.savePost(input)),
         body: input.body,
         uploadedMedia: [],
-        mediaNameMap: {},
+        mediaNamesById: {},
       };
     }
 
@@ -698,27 +678,32 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
     if (!input.frontMatter.title.trim()) {
       throw new AppError("VALIDATION", "文章标题不能为空。", 400);
     }
-    const totalBytes = input.media.reduce(
-      (total, media) => total + media.bytes.byteLength,
-      0,
-    );
+    const totalBytes = input.media.reduce((total, media) => total + media.size, 0);
     if (totalBytes > 32 * 1024 * 1024) {
       throw new AppError(
         "UPLOAD_INVALID",
-        "一篇文章待上传图片总量不能超过 32 MiB。",
+        "一篇文章的暂存图片总量不能超过 32 MiB。",
         413,
       );
     }
-    const singleLimit = Math.min(this.config.uploadLimitMb, 8) * 1024 * 1024;
+    const seenIds = new Set<string>();
     for (const media of input.media) {
-      if (media.bytes.byteLength > singleLimit) {
+      if (seenIds.has(media.id)) {
+        throw new AppError("VALIDATION", "图片暂存凭证包含重复项目。", 400);
+      }
+      seenIds.add(media.id);
+      if (media.size <= 0 || media.size > STAGED_IMAGE_MAX_BYTES) {
         throw new AppError(
           "UPLOAD_INVALID",
-          `单张图片不能超过 ${Math.min(this.config.uploadLimitMb, 8)} MiB。`,
+          "准备后的单张图片不能超过 3.5 MiB。",
           413,
         );
       }
-      validateImageBytes(media.bytes, cleanFileName(media.name), media.contentType);
+      if (!/^[0-9a-f]{40}$/.test(media.blobSha)) {
+        throw new AppError("VALIDATION", "图片 Blob SHA 不合法。", 400);
+      }
+      assertPreparedMediaName(media.preparedName);
+      validateImageFileExtension(media.preparedName, media.contentType);
     }
 
     const targetPath = postPath(this.config, input.kind, slug);
@@ -726,6 +711,18 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
       ? normalizeRepoPath(input.currentPath)
       : undefined;
     const tree = await this.tree();
+    if (
+      input.expectedHeadSha &&
+      input.expectedHeadSha !== tree.headSha &&
+      !input.force
+    ) {
+      throw new AppError(
+        "CONFLICT",
+        "远程仓库在你打开文章后已发生变化。",
+        409,
+        { remoteHeadSha: tree.headSha },
+      );
+    }
     const currentEntry = currentPath
       ? tree.entries.find((entry) => entry.path === currentPath)
       : undefined;
@@ -774,12 +771,11 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
       .filter(
         (entry) =>
           entry.type === "blob" &&
-          entry.path?.startsWith(`${assetDirectory}/`) &&
-          !entry.path?.startsWith(`${oldAssetDirectory}/`),
+          entry.path?.startsWith(`${assetDirectory}/`),
       )
       .forEach((entry) => reservedNames.add(entry.path!.split("/").at(-1)!));
 
-    const mediaNameMap: Record<string, string> = {};
+    const mediaNamesById: Record<string, string> = {};
     const stagedMedia: Array<{
       source: (typeof input.media)[number];
       name: string;
@@ -788,34 +784,19 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
     }> = [];
     let finalBody = input.body;
     for (const media of input.media) {
-      const cleanName = cleanFileName(media.name);
-      const dot = cleanName.lastIndexOf(".");
-      const stem = cleanName.slice(0, dot);
-      const extension = cleanName.slice(dot);
-      let name = cleanName;
-      let suffix = 2;
-      while (reservedNames.has(name)) {
-        name = `${stem}-${suffix}${extension}`;
-        suffix += 1;
-      }
+      const name = uniqueMediaName(media.preparedName, reservedNames);
       reservedNames.add(name);
-      mediaNameMap[media.id] = name;
-      if (name !== media.name) {
-        finalBody = finalBody.replaceAll(
-          `{% asset_img "${media.name}"`,
-          `{% asset_img "${name}"`,
-        );
-      }
-      const blob = await this.octokit.rest.git.createBlob({
-        ...this.args(),
-        content: encodeBase64(media.bytes),
-        encoding: "base64",
-      });
+      mediaNamesById[media.id] = name;
+      finalBody = replaceAssetImageReference(
+        finalBody,
+        media.referenceName,
+        name,
+      );
       stagedMedia.push({
         source: media,
         name,
         path: `${assetDirectory}/${name}`,
-        sha: blob.data.sha,
+        sha: media.blobSha,
       });
     }
 
@@ -874,13 +855,13 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
       commitSha: committed.commitSha,
       message,
       body: finalBody,
-      mediaNameMap,
+      mediaNamesById,
       uploadedMedia: stagedMedia.map((media) => ({
         id: Buffer.from(media.path, "utf8").toString("base64url"),
         path: media.path,
         name: media.name,
         sha: media.sha,
-        size: media.source.bytes.byteLength,
+        size: media.source.size,
         scope: "post",
         postSlug: slug,
         uploadedAt: new Date().toISOString(),
@@ -1087,30 +1068,25 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
     contentType: string;
     postPath?: string;
   }): Promise<MediaAsset> {
-    const maxBytes = this.config.uploadLimitMb * 1024 * 1024;
-    if (input.bytes.byteLength > maxBytes) {
-      throw new AppError(
-        "UPLOAD_INVALID",
-        `图片不能超过 ${this.config.uploadLimitMb} MiB。`,
-        413,
-      );
-    }
-    const cleanName = cleanFileName(input.name);
-    validateImageBytes(input.bytes, cleanName, input.contentType);
+    const cleanName = prepareOrReuseMediaFileName({
+      originalName: input.name,
+      uploadedFileName: input.name,
+      contentType: input.contentType,
+    });
+    validateStagedImageBytes(input.bytes, cleanName, input.contentType);
     const directory = input.postPath
       ? assetDirectoryFromPostPath(input.postPath)
       : this.config.imagesPath;
     const tree = await this.tree();
-    const extension = cleanName.includes(".")
-      ? `.${cleanName.split(".").at(-1)}`
-      : "";
-    const stem = cleanName.slice(0, -extension.length);
-    let name = cleanName;
-    let suffix = 2;
-    while (tree.entries.some((entry) => entry.path === `${directory}/${name}`)) {
-      name = `${stem}-${suffix}${extension}`;
-      suffix += 1;
-    }
+    const name = uniqueMediaName(
+      cleanName,
+      tree.entries
+        .filter(
+          (entry) =>
+            entry.type === "blob" && entry.path?.startsWith(`${directory}/`),
+        )
+        .map((entry) => entry.path!.split("/").at(-1)!),
+    );
     const path = `${directory}/${name}`;
     const response = await this.octokit.rest.repos.createOrUpdateFileContents({
       ...this.args(),

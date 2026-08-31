@@ -1,5 +1,8 @@
 import sharp, { type Sharp } from "sharp";
 import { AppError } from "@/lib/errors";
+import { validateImageFileExtension } from "@/lib/media-name";
+
+export const STAGED_IMAGE_MAX_BYTES = Math.floor(3.5 * 1024 * 1024);
 
 export const SUPPORTED_IMAGE_CONTENT_TYPES = [
   "image/jpeg",
@@ -41,6 +44,32 @@ export function detectImageContentType(
     return "image/avif";
   }
   return undefined;
+}
+
+export function validateStagedImageBytes(
+  bytes: Uint8Array,
+  fileName: string,
+  reportedContentType: string,
+) {
+  if (!bytes.byteLength) {
+    throw new AppError("UPLOAD_INVALID", "图片文件不能为空。", 400);
+  }
+  if (bytes.byteLength > STAGED_IMAGE_MAX_BYTES) {
+    throw new AppError(
+      "UPLOAD_INVALID",
+      "准备后的单张图片不能超过 3.5 MiB。",
+      413,
+    );
+  }
+  validateImageFileExtension(fileName, reportedContentType);
+  if (detectImageContentType(bytes) !== reportedContentType) {
+    throw new AppError(
+      "UPLOAD_INVALID",
+      "图片 MIME 类型与文件内容不一致。",
+      400,
+    );
+  }
+  return reportedContentType as SupportedImageContentType;
 }
 
 function encoder(

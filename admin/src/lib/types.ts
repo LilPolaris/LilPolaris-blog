@@ -136,13 +136,24 @@ export interface PendingMedia {
   previewUrl?: string;
 }
 
-export interface PostBundleMediaInput {
+export interface StagePostMediaInput {
   id: string;
-  name: string;
+  referenceName: string;
+  preparedName: string;
   contentType: string;
   bytes: Uint8Array;
-  alt: string;
 }
+
+export interface StagedPostMedia {
+  id: string;
+  referenceName: string;
+  preparedName: string;
+  contentType: string;
+  size: number;
+  blobSha: string;
+}
+
+export type PostBundleMediaInput = StagedPostMedia;
 
 export interface PostBundleMutationInput extends PostMutationInput {
   media: PostBundleMediaInput[];
@@ -151,7 +162,7 @@ export interface PostBundleMutationInput extends PostMutationInput {
 export interface PostBundleMutationResult extends MutationResult {
   body: string;
   uploadedMedia: MediaAsset[];
-  mediaNameMap: Record<string, string>;
+  mediaNamesById: Record<string, string>;
 }
 
 export interface MediaAsset {

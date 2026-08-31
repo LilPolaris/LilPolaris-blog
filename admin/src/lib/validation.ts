@@ -32,16 +32,16 @@ export const postMutationSchema = z.object({
   force: z.boolean().optional(),
 });
 
-export const bundleManifestSchema = z
-  .array(
-    z.object({
-      id: z.string().min(1).max(100),
-      name: z.string().min(1).max(200),
-      contentType: z.string().min(1).max(100),
-      alt: z.string().max(300),
-    }),
-  )
-  .max(40);
+export const stageMediaMetadataSchema = z.object({
+  id: z.string().min(1).max(100),
+  referenceName: z.string().min(1).max(200),
+  originalName: z.string().min(1).max(200),
+});
+
+export const postBundleRequestSchema = z.object({
+  post: postMutationSchema,
+  mediaReceipts: z.array(z.string().min(1).max(4_096)).max(40),
+});
 
 export const duplicateSchema = z.object({
   action: z.literal("duplicate"),

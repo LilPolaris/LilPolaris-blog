@@ -1,6 +1,11 @@
 import { requireAdminApi } from "@/lib/auth-guard";
 import { AppError, errorResponse } from "@/lib/errors";
 import { isMediaReferenced } from "@/lib/media-usage";
+import {
+  beginApiRequest,
+  jsonWithRequestId,
+  logApiEvent,
+} from "@/lib/observability";
 import { getRepository } from "@/lib/repository";
 
 async function mapWithConcurrency<T, R>(
@@ -23,12 +28,15 @@ async function mapWithConcurrency<T, R>(
 }
 
 export async function GET(request: Request) {
+  const context = beginApiRequest(request, "media.list");
   try {
     await requireAdminApi();
     const repository = await getRepository();
     const params = new URL(request.url).searchParams;
     if (params.get("usage") !== "1") {
-      return Response.json({ data: await repository.listMedia() });
+      const media = await repository.listMedia();
+      logApiEvent(context, "api.request.succeeded", { count: media.length });
+      return jsonWithRequestId(context, { data: media });
     }
     const [media, posts] = await Promise.all([
       repository.listMedia(),
@@ -49,13 +57,18 @@ export async function GET(request: Request) {
           })),
       ]),
     );
-    return Response.json({ data: { usage } });
+    logApiEvent(context, "api.request.succeeded", {
+      mediaCount: media.length,
+      postCount: posts.length,
+    });
+    return jsonWithRequestId(context, { data: { usage } });
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, context);
   }
 }
 
 export async function POST(request: Request) {
+  const context = beginApiRequest(request, "media.upload");
   try {
     await requireAdminApi();
     const formData = await request.formData();
@@ -71,13 +84,18 @@ export async function POST(request: Request) {
       contentType: file.type,
       postPath: typeof postPath === "string" && postPath ? postPath : undefined,
     });
-    return Response.json({ data: media }, { status: 201 });
+    logApiEvent(context, "api.request.succeeded", {
+      size: media.size,
+      scope: media.scope,
+    });
+    return jsonWithRequestId(context, { data: media }, { status: 201 });
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, context);
   }
 }
 
 export async function DELETE(request: Request) {
+  const context = beginApiRequest(request, "media.delete");
   try {
     await requireAdminApi();
     const params = new URL(request.url).searchParams;
@@ -87,10 +105,12 @@ export async function DELETE(request: Request) {
       throw new AppError("VALIDATION", "缺少媒体路径或 SHA。", 400);
     }
     const repository = await getRepository();
-    return Response.json({
-      data: await repository.deleteMedia(path, sha),
+    const result = await repository.deleteMedia(path, sha);
+    logApiEvent(context, "api.request.succeeded");
+    return jsonWithRequestId(context, {
+      data: result,
     });
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, context);
   }
 }

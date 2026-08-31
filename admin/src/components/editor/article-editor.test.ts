@@ -22,4 +22,12 @@ describe("ArticleEditor save wiring", () => {
     expect(editorSource).toContain("取消发布并移入草稿");
     expect(editorSource).toContain("文章将从公开站点下线并移入草稿");
   });
+
+  it("stages referenced media before sending the small JSON bundle", () => {
+    expect(editorSource).toContain('fetch("/api/posts/media/stage"');
+    expect(editorSource).toContain("mediaReceipts: stagedMedia.map");
+    expect(editorSource).toContain('headers: { "content-type": "application/json" }');
+    expect(editorSource).toContain("result.mediaNamesById");
+    expect(editorSource).toContain("mapWithConcurrency(");
+  });
 });
