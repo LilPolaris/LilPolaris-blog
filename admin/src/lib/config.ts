@@ -146,6 +146,14 @@ export function configurationStatus() {
   if (env.REPOSITORY_ADAPTER === "github" && !env.GITHUB_TOKEN) {
     missing.push("GITHUB_TOKEN");
   }
+  if (
+    env.REPOSITORY_ADAPTER === "github" &&
+    env.AUTH_MODE === "oauth" &&
+    env.GITHUB_BRANCH.toLowerCase() === "main" &&
+    env.CONTENT_WRITE_POLICY !== "production-main"
+  ) {
+    missing.push("CONTENT_WRITE_POLICY");
+  }
   return {
     configured: missing.length === 0,
     missing,
