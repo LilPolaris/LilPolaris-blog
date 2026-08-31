@@ -1,12 +1,11 @@
 ---
 title: 大学生数字生存指南-0
 tags:
-  - 教程
   - 计算机
-  - 提问
 categories:
-  - - 教程
-    - 分享
+  - 教程
+series: 大学生数字生存指南
+toc_style_simple: false
 date: 2026-07-25 13:11:44
 updated: 2026-07-25 15:53:02
 excerpt: 在你一无所知的时候，最重要的是学会独立找到问题的答案

@@ -9,11 +9,9 @@ tags:
   - Butterfly
 categories:
   - 教程
-  - 分享
 keywords: Hexo, 博客搭建, GitHub Pages, Butterfly, 教程
 description: 从零开始搭建 Hexo 博客，并部署到 GitHub Pages 的完整入门教程。
 ---
-# 从零开始用 HEXO 搭建个人博客 —— 完整教程
 
 > 本教程面向零基础用户，手把手教你用 Hexo 框架搭建一个免费的个人博客，并部署到 GitHub Pages 上。
 

@@ -19,10 +19,10 @@ nav:
 
 menu:
   首页: / || fas fa-home
-  文章 || fas fa-feather-alt:
-    归档: /archives/ || fas fa-archive
-    分类: /categories/ || fas fa-folder-open
-    标签: /tags/ || fas fa-tags
+  教程: /categories/%E6%95%99%E7%A8%8B/ || fas fa-compass
+  校园: /categories/%E6%A0%A1%E5%9B%AD/ || fas fa-graduation-cap
+  随笔: /categories/%E9%9A%8F%E7%AC%94/ || fas fa-pen-nib
+  归档: /archives/ || fas fa-archive
   关于: /about/ || fas fa-user
 
 # --------------------------------------
@@ -225,7 +225,7 @@ index_post_content:
 toc:
   post: true
   page: false
-  number: true
+  number: false
   expand: false
   # Only for post
   style_simple: true
@@ -370,7 +370,7 @@ aside:
   card_post_series:
     enable: true
     # The title shows the series name
-    series_title: false
+    series_title: true
     # Order by title or date
     orderBy: 'date'
     # Sort of order. 1, asc for ascending; -1, desc for descending
@@ -432,9 +432,9 @@ rightside_scroll_percent: true
 rightside_item_order:
   enable: true
   # Default: readmode,translate,darkmode,hideAside
-  hide:
+  hide: readmode,darkmode,hideAside
   # Default: toc,chat,comment
-  show: readmode,darkmode,toc
+  show: toc
 
 # Animation for the bottom right config button
 rightside_config_animation: false
@@ -966,7 +966,7 @@ lightbox:
 
 # Series
 series:
-  enable: false
+  enable: true
   # Order by title or date
   orderBy: 'title'
   # Sort of order. 1, asc for ascending; -1, desc for descending
@@ -1111,6 +1111,7 @@ inject:
   head:
     - '<link rel="stylesheet" href="/css/site-polish.css">'
   bottom:
+    - '<script defer src="/js/site-accessibility.js"></script>'
 
 
 # CDN Settings

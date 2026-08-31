@@ -10,7 +10,6 @@ tags:
   - Windows
 categories:
   - 教程
-  - 分享
 keywords: AstrBot, QQ机器人, NapCat, OneBot, Windows
 description: 从零开始安装 AstrBot、接入大模型，并配置 NapCat 连接 QQ 机器人。
 ---
