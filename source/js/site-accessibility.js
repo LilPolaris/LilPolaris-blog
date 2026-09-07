@@ -1,4 +1,23 @@
 (() => {
+  const palettes = [
+    ['mint', '薄荷青', '#9fcfc3'],
+    ['rose', '豆沙粉', '#d4a7ac'],
+    ['blue', '雾霾蓝', '#a2bdcf'],
+    ['lavender', '淡紫', '#bcb0cd'],
+    ['amber', '暖杏', '#d7bc93']
+  ]
+  const paletteKey = 'polaris-palette'
+  const validPalette = value => palettes.some(([name]) => name === value)
+  let palette = 'mint'
+  try {
+    const saved = localStorage.getItem(paletteKey)
+    if (validPalette(saved)) palette = saved
+  } catch {
+    // Storage can be unavailable; the selector still works for this visit.
+  }
+  document.documentElement.dataset.polarisPalette = palette
+  let closePalette = () => {}
+
   const isVisible = element => Boolean(element && element.getClientRects().length)
 
   const initSidebar = () => {
@@ -88,14 +107,76 @@
   const initRightside = () => {
     const panel = document.getElementById('rightside-config-hide')
     const trigger = document.getElementById('rightside-config')
-    if (!panel || !trigger || trigger.dataset.a11yBound) return
+    if (!panel || !trigger) return
 
+    if (!panel.querySelector('#polaris-palette-toggle')) {
+      closePalette()
+      document.getElementById('polaris-palette-panel')?.remove()
+      const button = document.createElement('button')
+      button.id = 'polaris-palette-toggle'
+      button.type = 'button'
+      button.title = '主题颜色'
+      button.setAttribute('aria-label', '选择主题颜色')
+      button.setAttribute('aria-controls', 'polaris-palette-panel')
+      button.setAttribute('aria-expanded', 'false')
+      const icon = document.createElement('i')
+      icon.className = 'fas fa-palette'
+      icon.setAttribute('aria-hidden', 'true')
+      button.append(icon)
+      const darkMode = panel.querySelector('#darkmode')
+      if (darkMode) darkMode.after(button)
+      else panel.append(button)
+
+      const picker = document.createElement('div')
+      picker.id = 'polaris-palette-panel'
+      picker.hidden = true
+      picker.setAttribute('role', 'group')
+      picker.setAttribute('aria-label', '主题颜色')
+      palettes.forEach(([name, label, color]) => {
+        const option = document.createElement('button')
+        option.type = 'button'
+        option.textContent = label
+        option.dataset.palette = name
+        option.style.setProperty('--palette-swatch', color)
+        option.setAttribute('aria-label', `使用${label}主题`)
+        option.setAttribute('aria-pressed', String(name === palette))
+        option.addEventListener('click', () => {
+          palette = name
+          document.documentElement.dataset.polarisPalette = name
+          try {
+            localStorage.setItem(paletteKey, name)
+          } catch {
+            // Keep the selected palette even when persistence is blocked.
+          }
+          picker.querySelectorAll('button').forEach(item => {
+            item.setAttribute('aria-pressed', String(item.dataset.palette === name))
+          })
+          closePalette(true)
+        })
+        picker.append(option)
+      })
+      document.body.append(picker)
+      closePalette = (restoreFocus = false) => {
+        if (picker.hidden) return
+        picker.hidden = true
+        button.setAttribute('aria-expanded', 'false')
+        if (restoreFocus && button.isConnected && !panel.inert) button.focus()
+      }
+      button.addEventListener('click', () => {
+        const open = picker.hidden
+        picker.hidden = !open
+        button.setAttribute('aria-expanded', String(open))
+        if (open) picker.querySelector('[aria-pressed="true"]').focus()
+      })
+    }
+    if (trigger.dataset.a11yBound) return
     trigger.dataset.a11yBound = 'true'
     const syncState = () => {
       const open = panel.classList.contains('show')
       trigger.setAttribute('aria-expanded', String(open))
       panel.setAttribute('aria-hidden', String(!open))
       panel.inert = !open
+      if (!open) closePalette()
     }
     new MutationObserver(syncState).observe(panel, {
       attributes: true,
@@ -136,7 +217,19 @@
     })
   }
 
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closePalette(true)
+  })
+  document.addEventListener('click', event => {
+    if (!event.target.closest('#polaris-palette-panel, #polaris-palette-toggle')) closePalette()
+  })
+  document.addEventListener('focusin', event => {
+    if (!event.target.closest('#polaris-palette-panel, #polaris-palette-toggle')) closePalette()
+  })
+
   const init = () => {
+    closePalette()
+    document.documentElement.dataset.polarisPalette = palette
     initSidebar()
     initSearch()
     initRightside()
@@ -149,4 +242,3 @@
     : init()
   window.addEventListener('pjax:complete', init)
 })()
-
