@@ -3,7 +3,8 @@ title: Lil Polaris大一下总结（大学物理（甲）Ⅰ、常微分方程�
 tags:
   - 浙江大学
 categories:
-  - - 大学
+  - - 校园
+    - 大学
     - 课程测评
 date: 2026-08-28 20:22:26
 first_published_at: 2026-08-28 20:22:26
