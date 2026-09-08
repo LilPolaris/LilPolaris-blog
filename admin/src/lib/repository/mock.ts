@@ -457,7 +457,7 @@ categories:
     }
     const targetPath = postPath(
       this.config,
-      kindFromPath(normalized, this.config),
+      "draft",
       targetSlug,
     );
     if (this.files.has(targetPath)) {
@@ -480,7 +480,8 @@ categories:
           slug: targetSlug,
           date: "",
           firstPublishedAt: "",
-          draft: kind === "draft",
+          permalink: "",
+          draft: true,
         },
         sourceDocument.body,
         {

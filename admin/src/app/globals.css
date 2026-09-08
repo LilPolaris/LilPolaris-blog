@@ -2,6 +2,63 @@
 @import "katex/dist/katex.min.css";
 @import "highlight.js/styles/github-dark.css";
 
+.post-list-summary {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 16px 18px 0;
+}
+
+.post-status-filters { display: flex; flex-wrap: wrap; gap: 4px; }
+.post-status-filter {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 40px;
+  padding: 7px 12px;
+}
+.post-status-filter span { font-size: 12px; font-variant-numeric: tabular-nums; }
+.post-status-filter:hover { background: var(--surface-muted); }
+.post-status-filter[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--primary) 9%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
+  color: var(--primary);
+  font-weight: 650;
+}
+.post-action-menu {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-popover);
+  min-width: 168px;
+  padding: 5px;
+  z-index: 80;
+}
+.post-action-item {
+  align-items: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  gap: 9px;
+  min-height: 40px;
+  padding: 8px 10px;
+}
+.post-action-item[data-highlighted] { background: var(--surface-muted); outline: none; }
+.post-action-item[data-disabled] { opacity: .5; pointer-events: none; }
+.post-action-item.danger { color: var(--destructive); }
+.post-action-separator { background: var(--border); height: 1px; margin: 4px; }
+.preview-outline { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 24px; padding: 10px 14px; }
+.preview-outline summary { cursor: pointer; font-weight: 620; }
+.preview-outline .outline-depth-2 { margin-left: 12px; }
+.preview-outline .outline-depth-3 { margin-left: 24px; }
+
 :root {
   --background: #f7f8fa;
   --foreground: #17191d;

@@ -86,14 +86,25 @@ describe("MockRepositoryAdapter", () => {
       "welcome-copy",
     );
     const copiedPost = await repository.getPost(publishedCopy.path);
-    expect(copiedPost.frontMatter.date).toMatch(
-      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
-    );
-    expect(copiedPost.frontMatter.date).not.toBe(published.frontMatter.date);
-    expect(copiedPost.frontMatter.firstPublishedAt).toBe(
-      copiedPost.frontMatter.date,
-    );
+    expect(copiedPost.path).toBe("source/_drafts/welcome-copy.md");
+    expect(copiedPost.kind).toBe("draft");
+    expect(copiedPost.frontMatter.date).toBe("");
+    expect(copiedPost.frontMatter.firstPublishedAt).toBe("");
+    expect(copiedPost.body).toBe(published.body);
+    expect(await repository.getPost(published.path)).toMatchObject({ sha: published.sha, body: published.body, frontMatter: published.frontMatter });
     expect(copiedPost.sha).not.toBe(published.sha);
+
+    const released = await repository.savePost({
+      currentPath: copiedPost.path,
+      expectedSha: copiedPost.sha,
+      kind: "post",
+      slug: copiedPost.slug,
+      body: copiedPost.body,
+      frontMatter: { ...copiedPost.frontMatter, draft: false },
+    });
+    const releasedCopy = await repository.getPost(released.path);
+    expect(releasedCopy.frontMatter.firstPublishedAt).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(releasedCopy.frontMatter.firstPublishedAt).not.toBe(published.frontMatter.date);
 
     const draft = await repository.getPost(
       "source/_drafts/next-article.md",
