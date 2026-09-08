@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:editor": "node scripts/smoke-editor.mjs",
-    "smoke:upload": "node scripts/smoke-upload.mjs"
+    "smoke:upload": "node scripts/smoke-upload.mjs",
+    "smoke:quality": "node scripts/smoke-quality.mjs"
   },
   "dependencies": {
     "@emnapi/runtime": "^1.11.3",

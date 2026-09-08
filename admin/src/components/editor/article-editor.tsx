@@ -43,6 +43,7 @@ import {
 import { livePreviewExtension } from "@/components/editor/live-preview-extension";
 import { MediaPickerDialog } from "@/components/media/media-picker";
 import { formatBlogTimestamp } from "@/lib/blog-time";
+import { markdownOutline } from "@/lib/markdown-outline";
 import {
   imageFile,
   mapWithConcurrency,
@@ -604,13 +605,14 @@ export function ArticleEditor({
     if (!dirty) return;
     let restoringHistory = false;
     const guardInternalNavigation = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const target = event.target;
       const anchor = target instanceof Element ? target.closest("a") : null;
       if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download")) {
         return;
       }
       const destination = new URL(anchor.href, window.location.href);
+      if (destination.pathname === window.location.pathname && destination.search === window.location.search) return;
       if (
         destination.origin === window.location.origin &&
         destination.href !== window.location.href &&
@@ -1207,13 +1209,7 @@ export function ArticleEditor({
   }
 
   const stats = useMemo(() => readingStats(body), [body]);
-  const outline = useMemo(() => {
-    return [...body.matchAll(/^(#{1,4})\s+(.+)$/gm)].map((match) => ({
-      level: match[1].length,
-      label: match[2].replace(/[*_`[\]]/g, ""),
-      position: match.index,
-    }));
-  }, [body]);
+  const outline = useMemo(() => markdownOutline(body), [body]);
   const filteredCommands =
     slashQuery === null
       ? []

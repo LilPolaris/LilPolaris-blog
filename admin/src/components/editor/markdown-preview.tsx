@@ -1,51 +1,113 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
-import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import { memo, useEffect, useId, useMemo, useState } from "react";
+import ReactMarkdown, {
+  defaultUrlTransform,
+  type Components,
+} from "react-markdown";
+import { nodeText, previewHeadings } from "@/lib/preview-headings";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
-function headingId(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^\p{L}\p{N}\s-]/gu, "")
-    .replace(/\s+/g, "-");
+let mermaidLoader: Promise<(typeof import("mermaid"))["default"]> | undefined;
+let renderSequence = 0;
+
+function loadMermaid() {
+  mermaidLoader ??= import("mermaid")
+    .then(({ default: mermaid }) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: "strict",
+        theme: "neutral",
+        suppressErrorRendering: true,
+      });
+      return mermaid;
+    })
+    .catch((error) => {
+      mermaidLoader = undefined;
+      throw error;
+    });
+  return mermaidLoader;
 }
 
 function MermaidBlock({ source }: { source: string }) {
-  const id = useId().replaceAll(":", "");
-  const [svg, setSvg] = useState("");
-  const [error, setError] = useState("");
-
+  const [result, setResult] = useState<{
+    source: string;
+    svg?: string;
+    error?: string;
+  }>();
   useEffect(() => {
     let cancelled = false;
-    import("mermaid")
-      .then(async ({ default: mermaid }) => {
-        mermaid.initialize({
-          startOnLoad: false,
-          securityLevel: "strict",
-          theme: "neutral",
-          suppressErrorRendering: true,
+    const timer = window.setTimeout(() => {
+      void loadMermaid()
+        .then(async (mermaid) => {
+          if (cancelled) return;
+          const rendered = await mermaid.render(
+            `mermaid-preview-${++renderSequence}`,
+            source,
+          );
+          if (!cancelled) setResult({ source, svg: rendered.svg });
+        })
+        .catch(() => {
+          if (!cancelled)
+            setResult({
+              source,
+              error: "Mermaid 图表无法渲染，请检查语法或稍后重试。",
+            });
         });
-        const result = await mermaid.render(`mermaid-${id}`, source);
-        if (!cancelled) setSvg(result.svg);
-      })
-      .catch(() => {
-        if (!cancelled) setError("Mermaid 图表语法有误。");
-      });
+    }, 200);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [id, source]);
+  }, [source]);
 
-  if (error) return <div className="alert danger">{error}</div>;
-  if (!svg) return <div className="skeleton" style={{ height: 120 }} />;
-  return <div dangerouslySetInnerHTML={{ __html: svg }} />;
+  if (result?.source !== source)
+    return (
+      <div
+        aria-label="正在渲染图表"
+        className="skeleton"
+        style={{ height: 120 }}
+      />
+    );
+  if (result.error)
+    return (
+      <div className="alert danger" role="status">
+        {result.error}
+      </div>
+    );
+  return <div dangerouslySetInnerHTML={{ __html: result.svg || "" }} />;
 }
 
+// Stable component identities preserve diagram state across surrounding edits.
+const previewComponents: Components = {
+  pre: ({ node, children, ...props }) => {
+    const code = node?.children[0];
+    if (
+      code?.type === "element" &&
+      code.tagName === "code" &&
+      Array.isArray(code.properties.className) &&
+      code.properties.className.includes("language-mermaid")
+    ) {
+      return <MermaidBlock source={nodeText(code).replace(/\n$/, "")} />;
+    }
+    return <pre {...props}>{children}</pre>;
+  },
+  img: ({ alt, src, title, width, height }) => (
+    // Markdown URLs are filtered by ReactMarkdown before reaching this component.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      alt={alt || ""}
+      src={src}
+      title={title}
+      width={width}
+      height={height}
+      loading="lazy"
+    />
+  ),
+};
 function transformAssetTags(
   markdown: string,
   postPath?: string,
@@ -53,7 +115,15 @@ function transformAssetTags(
 ) {
   return markdown.replace(
     /\{%\s*asset_img\s+(?:"([^"]+)"|'([^']+)'|(\S+))(?:\s+(?:"([^"]+)"|'([^']+)'|([^%]+?)))?\s*%\}/g,
-    (_match, doubleFile, singleFile, bareFile, doubleAlt, singleAlt, bareAlt) => {
+    (
+      _match,
+      doubleFile,
+      singleFile,
+      bareFile,
+      doubleAlt,
+      singleAlt,
+      bareAlt,
+    ) => {
       const file = doubleFile || singleFile || bareFile;
       const alt = (doubleAlt || singleAlt || bareAlt || file).trim();
       if (assetUrls[file]) return `![${alt}](${assetUrls[file]})`;
@@ -65,7 +135,7 @@ function transformAssetTags(
   );
 }
 
-export function MarkdownPreview({
+export const MarkdownPreview = memo(function MarkdownPreview({
   markdown,
   postPath,
   assetUrls,
@@ -80,73 +150,16 @@ export function MarkdownPreview({
     () => transformAssetTags(markdown, postPath, assetUrls),
     [assetUrls, markdown, postPath],
   );
-  const headings = useMemo(
-    () =>
-      source
-        .split(/\r?\n/)
-        .map((line) => line.match(/^(#{1,3})\s+(.+)$/))
-        .filter(Boolean)
-        .map((match) => ({
-          depth: match![1].length,
-          label: match![2].replace(/[*_`[\]]/g, ""),
-        })),
-    [source],
-  );
-
+  const prefix = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   return (
     <article className="markdown-body">
-      {!hideOutline && headings.length > 2 ? (
-        <details
-          style={{
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius)",
-            marginBottom: 24,
-            padding: "10px 14px",
-          }}
-        >
-          <summary style={{ cursor: "pointer", fontWeight: 620 }}>目录</summary>
-          <ol style={{ margin: "10px 0 0", paddingLeft: 20 }}>
-            {headings.map((heading, index) => (
-              <li
-                key={`${heading.label}-${index}`}
-                style={{ marginLeft: (heading.depth - 1) * 12 }}
-              >
-                <a href={`#${headingId(heading.label)}`}>{heading.label}</a>
-              </li>
-            ))}
-          </ol>
-        </details>
-      ) : null}
       <ReactMarkdown
-        components={{
-          h1: ({ children }) => (
-            <h1 id={headingId(String(children))}>{children}</h1>
-          ),
-          h2: ({ children }) => (
-            <h2 id={headingId(String(children))}>{children}</h2>
-          ),
-          h3: ({ children }) => (
-            <h3 id={headingId(String(children))}>{children}</h3>
-          ),
-          code: ({ className, children, ...props }) => {
-            const language = /language-(\w+)/.exec(className || "")?.[1];
-            const value = String(children).replace(/\n$/, "");
-            if (language === "mermaid") {
-              return <MermaidBlock source={value} />;
-            }
-            return (
-              <code className={className} {...props}>
-                {children}
-              </code>
-            );
-          },
-          img: ({ alt, ...props }) => (
-            // Markdown image sources are intentionally rendered after ReactMarkdown URL filtering.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img alt={alt || ""} loading="lazy" {...props} />
-          ),
-        }}
-        rehypePlugins={[rehypeKatex, rehypeHighlight]}
+        components={previewComponents}
+        rehypePlugins={[
+          [previewHeadings, { prefix: `preview-${prefix}`, hideOutline }],
+          rehypeKatex,
+          rehypeHighlight,
+        ]}
         remarkPlugins={[remarkGfm, remarkMath]}
         urlTransform={(url) =>
           url.startsWith("blob:") ? url : defaultUrlTransform(url)
@@ -156,4 +169,4 @@ export function MarkdownPreview({
       </ReactMarkdown>
     </article>
   );
-}
+});

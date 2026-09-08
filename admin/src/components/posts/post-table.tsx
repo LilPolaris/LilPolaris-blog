@@ -1,5 +1,6 @@
 "use client";
 
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   ChevronLeft,
   ChevronRight,
@@ -9,10 +10,11 @@ import {
   MoreHorizontal,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { formatDate } from "@/lib/format";
 import {
@@ -38,15 +40,28 @@ export function PostTable({
   fixedKind?: "post" | "draft";
 }) {
   const router = useRouter();
-  const basePath = fixedKind ? "/drafts" : "/posts";
+  const basePath = fixedKind === "draft" ? "/drafts" : "/posts";
   const [listState, setListState] = useState<PostListState>(() => ({
     ...DEFAULT_POST_LIST_STATE,
     status: fixedKind || "all",
   }));
   const [urlReady, setUrlReady] = useState(false);
   const [busy, setBusy] = useState("");
+  const busyRef = useRef(false);
   const [message, setMessage] = useState("");
   const { category, page, query, sort, status: kind, tag } = listState;
+  const deferredQuery = useDeferredValue(query);
+  const hasFilters = Boolean(
+    query || category || tag || (!fixedKind && kind !== "all"),
+  );
+  const counts = useMemo(
+    () => ({
+      all: posts.length,
+      post: posts.filter((post) => post.kind === "post").length,
+      draft: posts.filter((post) => post.kind === "draft").length,
+    }),
+    [posts],
+  );
 
   useEffect(() => {
     const restoreFromUrl = () => {
@@ -88,13 +103,13 @@ export function PostTable({
     [posts],
   );
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized = deferredQuery.trim().toLowerCase();
     return posts
       .filter((post) => {
         if (kind !== "all" && post.kind !== kind) return false;
         if (
           normalized &&
-          !`${post.title} ${post.slug} ${post.tags.join(" ")}`
+          !`${post.title} ${post.slug} ${post.tags.join(" ")} ${post.categories.flat().join(" ")}`
             .toLowerCase()
             .includes(normalized)
         ) {
@@ -110,7 +125,7 @@ export function PostTable({
         return true;
       })
       .sort((a, b) => b[sort].localeCompare(a[sort]));
-  }, [category, kind, posts, query, sort, tag]);
+  }, [category, kind, posts, deferredQuery, sort, tag]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const visible = filtered.slice(
@@ -122,20 +137,29 @@ export function PostTable({
     setListState((current) => ({ ...current, ...patch, page: 1 }));
   }
 
+  function clearFilters() {
+    setListState((current) => ({
+      ...DEFAULT_POST_LIST_STATE,
+      sort: current.sort,
+      status: fixedKind || "all",
+    }));
+  }
+
   async function transition(post: PostSummary) {
+    if (busyRef.current) return;
     if (
       post.kind === "post" &&
-      !window.confirm(
-        `“${post.title}”将从公开站点下线并移入草稿。确定继续吗？`,
-      )
+      !window.confirm(`“${post.title}”将从公开站点下线并移入草稿。确定继续吗？`)
     ) {
       return;
     }
+    busyRef.current = true;
     setBusy(post.path);
     setMessage("");
     try {
       const currentResponse = await fetch(`/api/posts/${post.id}`);
-      if (!currentResponse.ok) throw new Error(await readError(currentResponse));
+      if (!currentResponse.ok)
+        throw new Error(await readError(currentResponse));
       const current = (await currentResponse.json()).data as PostDocument;
       const nextKind = post.kind === "post" ? "draft" : "post";
       const response = await fetch(`/api/posts/${post.id}`, {
@@ -160,14 +184,21 @@ export function PostTable({
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "操作失败。");
     } finally {
+      busyRef.current = false;
       setBusy("");
     }
   }
 
   async function duplicate(post: PostSummary) {
-    const targetSlug = window.prompt("请输入复制文章的新 slug：", `${post.slug}-copy`);
+    if (busyRef.current) return;
+    const targetSlug = window.prompt(
+      "将复制为草稿，请输入新文章的英文文件名：",
+      `${post.slug}-copy`,
+    );
     if (!targetSlug) return;
+    busyRef.current = true;
     setBusy(post.path);
+    setMessage("");
     try {
       const response = await fetch("/api/posts/actions", {
         method: "POST",
@@ -180,21 +211,25 @@ export function PostTable({
         }),
       });
       if (!response.ok) throw new Error(await readError(response));
-      setMessage("文章和关联资源已复制。");
+      setMessage("已复制为草稿，正文和关联图片已保留。可在草稿中继续编辑。");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "复制失败。");
     } finally {
+      busyRef.current = false;
       setBusy("");
     }
   }
 
   async function remove(post: PostSummary) {
+    if (busyRef.current) return;
     const deleteAssets = window.confirm(
       "确定删除文章吗？\n\n选择“确定”将删除文章但保留资源目录。若也要删除资源，请稍后在媒体库中单独删除。",
     );
     if (!deleteAssets) return;
+    busyRef.current = true;
     setBusy(post.path);
+    setMessage("");
     try {
       const response = await fetch(
         `/api/posts/${post.id}?sha=${encodeURIComponent(post.sha)}&deleteAssets=false`,
@@ -206,12 +241,51 @@ export function PostTable({
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "删除失败。");
     } finally {
+      busyRef.current = false;
       setBusy("");
     }
   }
 
   return (
     <section className="panel">
+      <div className="post-list-summary">
+        {!fixedKind ? (
+          <div
+            aria-label="文章状态"
+            className="post-status-filters"
+            role="group"
+          >
+            {(
+              [
+                ["all", "全部"],
+                ["post", "已发布"],
+                ["draft", "草稿"],
+              ] as const
+            ).map(([status, label]) => (
+              <button
+                aria-pressed={kind === status}
+                className="post-status-filter"
+                key={status}
+                onClick={() => updateFilter({ status })}
+                type="button"
+              >
+                {label}
+                <span>{counts[status]}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="list-primary">
+            {fixedKind === "draft" ? "草稿" : "已发布"} · {counts[fixedKind]} 篇
+          </span>
+        )}
+        {hasFilters ? (
+          <button className="button ghost" onClick={clearFilters} type="button">
+            <X size={14} />
+            清除筛选
+          </button>
+        ) : null}
+      </div>
       <div className="toolbar">
         <label style={{ position: "relative" }}>
           <Search
@@ -223,27 +297,11 @@ export function PostTable({
             aria-label="搜索文章"
             className="input search-input"
             onChange={(event) => updateFilter({ query: event.target.value })}
-            placeholder="搜索标题、slug 或标签"
+            placeholder="搜索标题、文件名、标签或分类"
             style={{ paddingLeft: 34 }}
             value={query}
           />
         </label>
-        {!fixedKind ? (
-          <select
-            aria-label="按状态筛选"
-            className="select filter-select"
-            onChange={(event) =>
-              updateFilter({
-                status: event.target.value as "all" | "post" | "draft",
-              })
-            }
-            value={kind}
-          >
-            <option value="all">全部状态</option>
-            <option value="post">已发布</option>
-            <option value="draft">草稿</option>
-          </select>
-        ) : null}
         <select
           aria-label="按分类筛选"
           className="select filter-select"
@@ -281,7 +339,10 @@ export function PostTable({
 
       {visible.length ? (
         <>
-          <div className="table-wrap post-table-wrap">
+          <div
+            aria-busy={query !== deferredQuery}
+            className="table-wrap post-table-wrap"
+          >
             <table className="table post-table">
               <thead>
                 <tr>
@@ -337,6 +398,14 @@ export function PostTable({
                             {item}
                           </span>
                         ))}
+                        {post.tags.length > 3 ? (
+                          <span
+                            className="badge"
+                            title={post.tags.slice(3).join("、")}
+                          >
+                            +{post.tags.length - 3}
+                          </span>
+                        ) : null}
                       </div>
                     </td>
                     <td className="muted" data-label="更新时间">
@@ -358,31 +427,43 @@ export function PostTable({
                             <FileClock size={15} />
                           )}
                         </button>
-                        <button
-                          aria-label="复制文章"
-                          className="icon-button ghost"
-                          disabled={Boolean(busy)}
-                          onClick={() => duplicate(post)}
-                          title="复制文章"
-                          type="button"
-                        >
-                          <Copy size={15} />
-                        </button>
-                        <button
-                          aria-label="删除文章"
-                          className="icon-button ghost"
-                          disabled={Boolean(busy)}
-                          onClick={() => remove(post)}
-                          title="删除文章"
-                          type="button"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                        <MoreHorizontal
-                          aria-hidden="true"
-                          className="muted"
-                          size={15}
-                        />
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button
+                              aria-label={`更多操作：${post.title}`}
+                              className="icon-button ghost"
+                              disabled={Boolean(busy)}
+                              type="button"
+                            >
+                              <MoreHorizontal size={17} />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content
+                              align="end"
+                              className="post-action-menu"
+                              sideOffset={6}
+                            >
+                              <DropdownMenu.Item
+                                className="post-action-item"
+                                disabled={Boolean(busy)}
+                                onSelect={() => void duplicate(post)}
+                              >
+                                <Copy size={15} />
+                                复制为草稿
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Separator className="post-action-separator" />
+                              <DropdownMenu.Item
+                                className="post-action-item danger"
+                                disabled={Boolean(busy)}
+                                onSelect={() => void remove(post)}
+                              >
+                                <Trash2 size={15} />
+                                删除文章
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
                       </div>
                     </td>
                   </tr>
@@ -428,6 +509,17 @@ export function PostTable({
         </>
       ) : (
         <EmptyState
+          action={
+            hasFilters ? (
+              <button className="button" onClick={clearFilters} type="button">
+                显示全部{fixedKind === "draft" ? "草稿" : "文章"}
+              </button>
+            ) : (
+              <Link className="button primary" href="/posts/new">
+                新建文章
+              </Link>
+            )
+          }
           description={
             posts.length
               ? "没有符合当前筛选条件的文章。"

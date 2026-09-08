@@ -63,6 +63,36 @@ function readFixture(entries: Array<{ path: string; sha: string }>) {
 }
 
 describe("GitHubRepositoryAdapter reads", () => {
+  it("copies a published article and its assets into drafts in one non-forced commit", async () => {
+    const sourcePath = "source/_posts/article.md";
+    const fixture = readFixture([
+      { path: sourcePath, sha: "1".repeat(40) },
+      { path: "source/_posts/article/chart.png", sha: "2".repeat(40) },
+    ]);
+    fixture.rest.git.getBlob.mockResolvedValue({ data: { content: Buffer.from(
+      '---\ntitle: 原文\ndate: 2026-08-01 12:00:00\npermalink: original-url/\ncustom_field: keep\n---\n正文',
+    ).toString("base64") } });
+    const createTree = vi.fn(async () => ({ data: { sha: "new-tree", tree: [] } }));
+    const createCommit = vi.fn(async () => ({ data: { sha: "new-head" } }));
+    const updateRef = vi.fn(async () => ({}));
+    Object.assign(fixture.rest.git, { createTree, createCommit, updateRef });
+    const adapter = new GitHubRepositoryAdapter(config("duplicate-to-draft"), "token");
+    attachOctokit(adapter, fixture);
+    const copy = await adapter.duplicatePost(sourcePath, "1".repeat(40), "article-copy");
+    expect(copy.path).toBe("source/_drafts/article-copy.md");
+    const tree = (createTree.mock.calls[0] as unknown as [{ tree: Array<{ path: string; content?: string; sha?: string }> }])[0].tree;
+    expect(tree.map((entry) => entry.path)).toEqual([
+      "source/_drafts/article-copy.md", "source/_drafts/article-copy/chart.png",
+    ]);
+    expect(tree[0].content).not.toMatch(/^date:/m);
+    expect(tree[0].content).not.toContain("first_published_at:");
+    expect(tree[0].content).not.toContain("original-url/");
+    expect(tree[0].content).toContain("custom_field: keep");
+    expect(tree[1].sha).toBe("2".repeat(40));
+    expect(createCommit).toHaveBeenCalledTimes(1);
+    expect(updateRef).toHaveBeenCalledWith(expect.objectContaining({ force: false }));
+  });
+
   it("bounds blob concurrency and reuses head, tree, and blob caches", async () => {
     const entries = Array.from({ length: 14 }, (_, index) => ({
       path: `source/_posts/article-${index}.md`,

@@ -40,6 +40,30 @@ npm test
 npm run build
 ```
 
+文章列表支持状态数量、分类与标签筛选、一键清除筛选。“更多操作”中的
+“复制为草稿”会复制正文与关联资源，清除原文的发布时间与自定义永久链接；
+副本需要单独发布。
+
+本地综合浏览器验证使用专用 Mock 服务和测试会话密钥，不需要真实 GitHub 身份：
+
+```powershell
+# 在独立测试工作区运行；仅供本机 Mock 服务使用。
+$env:REPOSITORY_ADAPTER="mock"
+$env:AUTH_SECRET="local-admin-quality-test-only-2026"
+npm run build
+npm run start -- --hostname 127.0.0.1 --port 3217
+
+# 另开终端，密钥须与上面的本地测试服务一致。
+$env:ADMIN_SMOKE_URL="http://127.0.0.1:3217"
+$env:ADMIN_SMOKE_AUTH_SECRET="local-admin-quality-test-only-2026"
+npm run smoke:quality
+```
+
+脚本先验证本机地址、登录状态和 Mock 配置，然后检查文章列表、复制草稿、
+编辑保存、各管理页面和手机导航。结果及截图保存在系统临时目录
+`lilpolaris-admin-quality`。支持用 `ADMIN_SMOKE_OUTPUT` 指定输出目录，
+用 `EDGE_PATH` 指定浏览器路径。测试生成的浏览器会话文件仅用于该 Mock 服务。
+
 完整上传 smoke 必须连接 Mock 服务；脚本会先读取设置并拒绝对真实仓库执行：
 
 ```powershell

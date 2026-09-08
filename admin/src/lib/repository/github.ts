@@ -938,7 +938,7 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
       throw new AppError("CONFLICT", "远程文章已更新，请重新加载。", 409);
     }
     const kind = kindFromPath(normalizedPath, this.config);
-    const targetPath = postPath(this.config, kind, slug);
+    const targetPath = postPath(this.config, "draft", slug);
     if (tree.entries.some((entry) => entry.path === targetPath)) {
       throw new AppError("CONFLICT", "目标 slug 已存在。", 409);
     }
@@ -957,7 +957,8 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
         slug,
         date: "",
         firstPublishedAt: "",
-        draft: kind === "draft",
+        permalink: "",
+        draft: true,
       },
       sourceDocument.body,
       {
