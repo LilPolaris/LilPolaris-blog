@@ -44,6 +44,7 @@ import { livePreviewExtension } from "@/components/editor/live-preview-extension
 import { MediaPickerDialog } from "@/components/media/media-picker";
 import { formatBlogTimestamp } from "@/lib/blog-time";
 import { markdownOutline } from "@/lib/markdown-outline";
+import { readBrowserValue, writeBrowserValue } from "@/lib/browser-storage";
 import {
   imageFile,
   mapWithConcurrency,
@@ -306,18 +307,18 @@ export function ArticleEditor({
       mountedRef.current = false;
       const recovery = recoverySnapshotRef.current;
       if (recovery) {
-        void set(recoveryKeyRef.current, {
+        void Promise.resolve().then(() => set(recoveryKeyRef.current, {
           ...recovery,
           savedAt: Date.now(),
-        });
+        })).catch(() => undefined); // Autosave reports failures while mounted.
       }
     };
   }, []);
 
   useEffect(() => {
-    const flash = window.sessionStorage.getItem(EDITOR_FLASH_KEY);
+    const flash = readBrowserValue("session", EDITOR_FLASH_KEY);
     if (!flash) return;
-    window.sessionStorage.removeItem(EDITOR_FLASH_KEY);
+    writeBrowserValue("session", EDITOR_FLASH_KEY, null);
     const timer = window.setTimeout(() => {
       setMessage(flash);
       setSaveState("remote-saved");
@@ -344,7 +345,7 @@ export function ArticleEditor({
     previousRecoveryKeyRef.current = recoveryKey;
     const recovery = recoverySnapshotRef.current;
     if (!recovery) {
-      void del(previousKey);
+      void Promise.resolve().then(() => del(previousKey)).catch(() => undefined);
       return;
     }
     void set(recoveryKey, { ...recovery, savedAt: Date.now() })
@@ -355,7 +356,7 @@ export function ArticleEditor({
   }, [recoveryKey]);
 
   useEffect(() => {
-    const remembered = window.localStorage.getItem("lilpolaris-editor-mode");
+    const remembered = readBrowserValue("local", "lilpolaris-editor-mode");
     if (remembered === "live" || remembered === "source") {
       const timer = window.setTimeout(() => setEditorMode(remembered), 0);
       return () => window.clearTimeout(timer);
@@ -379,7 +380,7 @@ export function ArticleEditor({
 
   const changeEditorMode = useCallback((mode: EditorMode) => {
     setEditorMode(mode);
-    window.localStorage.setItem("lilpolaris-editor-mode", mode);
+    writeBrowserValue("local", "lilpolaris-editor-mode", mode);
   }, []);
 
   const queueImages = useCallback(
@@ -994,7 +995,7 @@ export function ArticleEditor({
         if (editedWhileSaving || unreferencedMediaCount) {
           window.history.replaceState(window.history.state, "", editorUrl);
         } else {
-          window.sessionStorage.setItem(EDITOR_FLASH_KEY, successMessage);
+          writeBrowserValue("session", EDITOR_FLASH_KEY, successMessage);
           router.replace(editorUrl);
         }
       }

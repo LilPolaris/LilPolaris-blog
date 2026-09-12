@@ -20,6 +20,7 @@ import {
   validateOriginalImage,
 } from "@/lib/client-image";
 import { formatBytes, formatDate } from "@/lib/format";
+import { MediaUploadError, uploadMediaRequest } from "@/lib/media-upload-request";
 import type { MediaAsset, PostKind } from "@/lib/types";
 
 type UploadStatus =
@@ -36,6 +37,7 @@ interface UploadTask {
   preparedSize?: number;
   progress: number;
   retryable?: boolean;
+  resultUnknown?: boolean;
   status: UploadStatus;
 }
 
@@ -49,67 +51,6 @@ type MediaUsage = Record<string, MediaReference[]>;
 
 const IMAGE_FILE_PATTERN = /\.(?:jpe?g|png|gif|webp|avif)$/i;
 
-function requestError(response: XMLHttpRequest) {
-  try {
-    const error = JSON.parse(response.responseText)?.error;
-    const message = error?.message || "上传失败，请稍后重试。";
-    const requestId =
-      error?.requestId || response.getResponseHeader("X-Request-ID");
-    return requestId ? `${message}（请求 ID：${requestId}）` : message;
-  } catch {
-    const requestId = response.getResponseHeader("X-Request-ID");
-    return requestId
-      ? `上传失败，请稍后重试。（请求 ID：${requestId}）`
-      : "上传失败，请稍后重试。";
-  }
-}
-
-function uploadRequest(
-  file: File,
-  onProgress: (progress: number) => void,
-  signal: AbortSignal,
-) {
-  return new Promise<MediaAsset>((resolve, reject) => {
-    const data = new FormData();
-    data.set("file", file);
-    const xhr = new XMLHttpRequest();
-    const abort = () => xhr.abort();
-    const cleanup = () => signal.removeEventListener("abort", abort);
-    if (signal.aborted) {
-      reject(new DOMException("上传已取消。", "AbortError"));
-      return;
-    }
-    signal.addEventListener("abort", abort, { once: true });
-    xhr.open("POST", "/api/media");
-    xhr.upload.addEventListener("progress", (event) => {
-      if (event.lengthComputable) {
-        onProgress(Math.round((event.loaded / event.total) * 100));
-      }
-    });
-    xhr.addEventListener("load", () => {
-      cleanup();
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText).data as MediaAsset);
-        } catch {
-          reject(new Error("服务器返回了无法识别的上传结果。"));
-        }
-      } else {
-        reject(new Error(requestError(xhr)));
-      }
-    });
-    xhr.addEventListener("error", () => {
-      cleanup();
-      reject(new Error("网络中断，上传失败。"));
-    });
-    xhr.addEventListener("abort", () => {
-      cleanup();
-      reject(new DOMException("上传已取消。", "AbortError"));
-    });
-    xhr.send(data);
-  });
-}
-
 export function MediaLibrary({
   initialMedia,
   limitMb,
@@ -121,6 +62,7 @@ export function MediaLibrary({
   const inputRef = useRef<HTMLInputElement>(null);
   const queueRef = useRef<Array<{ file: File; id: string }>>([]);
   const processingRef = useRef(false);
+  const refreshingRef = useRef(false);
   const uploadSequenceRef = useRef(0);
   const uploadControllerRef = useRef<AbortController | null>(null);
   const [media, setMedia] = useState(initialMedia);
@@ -133,6 +75,7 @@ export function MediaLibrary({
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState("");
   const [removing, setRemoving] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -176,7 +119,7 @@ export function MediaLibrary({
           preparedSize: prepared.file.size,
           status: "uploading",
         });
-        const item = await uploadRequest(
+        const item = await uploadMediaRequest(
           prepared.file,
           (progress) => updateUpload(task.id, { progress }),
           uploadController.signal,
@@ -192,6 +135,7 @@ export function MediaLibrary({
         updateUpload(task.id, {
           status: "error",
           error: error instanceof Error ? error.message : "上传失败。",
+          resultUnknown: error instanceof MediaUploadError && error.resultUnknown,
         });
       }
     }
@@ -201,6 +145,10 @@ export function MediaLibrary({
   }
 
   function enqueueFiles(files: File[]) {
+    if (refreshingRef.current) {
+      setMessage("正在刷新媒体库，请稍后再添加图片。");
+      return;
+    }
     const nextTasks = files.map((file): UploadTask => {
       uploadSequenceRef.current += 1;
       const id = `${Date.now()}-${uploadSequenceRef.current}-${file.name}-${file.size}`;
@@ -245,9 +193,35 @@ export function MediaLibrary({
   }
 
   function retry(task: UploadTask) {
+    if (refreshingRef.current) return;
+    if (queueRef.current.some((queued) => queued.id === task.id)) return;
+    if (task.resultUnknown && !window.confirm("上次上传结果尚未确认。请先刷新媒体库核对；如果图片已经存在，就不必重传。确认仍要重新上传吗？")) return;
     queueRef.current.push({ id: task.id, file: task.file });
-    updateUpload(task.id, { status: "queued", progress: 0, error: undefined });
+    updateUpload(task.id, { status: "queued", progress: 0, error: undefined, resultUnknown: false });
     void drainQueue();
+  }
+
+  async function refreshMedia() {
+    if (processingRef.current || refreshingRef.current || removing) return;
+    refreshingRef.current = true;
+    setRefreshing(true);
+    try {
+      const response = await fetch("/api/media", { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(payload.data)) {
+        throw new Error(payload?.error?.message || "媒体库刷新失败。");
+      }
+      setMedia(payload.data as MediaAsset[]);
+      setUsageByPath(undefined);
+      setUsage("all");
+      setQuery("");
+      setMessage("媒体库已刷新，上传队列已保留；请核对图片是否已经上传。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "媒体库刷新失败，请稍后重试。");
+    } finally {
+      refreshingRef.current = false;
+      setRefreshing(false);
+    }
   }
 
   async function filterUnused() {
@@ -351,7 +325,17 @@ export function MediaLibrary({
           <option value="unused">未找到正文引用</option>
         </select>
         <button
+          className="button"
+          disabled={refreshing || Boolean(removing) || uploads.some((task) => task.status === "queued" || task.status === "preparing" || task.status === "uploading")}
+          onClick={() => void refreshMedia()}
+          type="button"
+        >
+          <RefreshCw size={16} className={refreshing ? "spin" : ""} />
+          {refreshing ? "正在刷新…" : "刷新媒体库"}
+        </button>
+        <button
           className="button primary"
+          disabled={refreshing}
           onClick={() => inputRef.current?.click()}
           type="button"
         >
@@ -447,9 +431,9 @@ export function MediaLibrary({
                 <span style={{ width: `${task.progress}%` }} />
               </div>
               {task.status === "error" && task.retryable !== false ? (
-                <button className="button" onClick={() => retry(task)} type="button">
+                <button className="button" disabled={refreshing} onClick={() => retry(task)} type="button">
                   <RefreshCw size={14} />
-                  重试
+                  {task.resultUnknown ? "核对后重试" : "重试"}
                 </button>
               ) : task.status === "error" ? (
                 <span className="badge danger">无法上传</span>
@@ -529,7 +513,7 @@ export function MediaLibrary({
                     <button
                       aria-label={`删除 ${item.name}`}
                       className="icon-button danger"
-                      disabled={removing === item.path}
+                      disabled={refreshing || removing === item.path}
                       onClick={() => remove(item)}
                       type="button"
                     >

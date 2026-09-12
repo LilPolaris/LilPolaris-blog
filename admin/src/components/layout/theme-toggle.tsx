@@ -2,17 +2,43 @@
 
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useSyncExternalStore } from "react";
+import {
+  forgetBrowserFallback,
+  readBrowserValue,
+  writeBrowserValue,
+} from "@/lib/browser-storage";
+
+const THEME_KEY = "admin-theme";
 
 function subscribe(callback: () => void) {
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== THEME_KEY && event.key !== null) return;
+    try {
+      if (event.storageArea !== window.localStorage) return;
+    } catch {
+      return;
+    }
+    forgetBrowserFallback("local", THEME_KEY);
+    callback();
+  };
   window.addEventListener("admin-theme-change", callback);
-  return () => window.removeEventListener("admin-theme-change", callback);
+  window.addEventListener("storage", onStorage);
+  media.addEventListener("change", callback);
+  return () => {
+    window.removeEventListener("admin-theme-change", callback);
+    window.removeEventListener("storage", onStorage);
+    media.removeEventListener("change", callback);
+  };
 }
 
 function getThemeSnapshot() {
-  const stored = localStorage.getItem("admin-theme");
+  const stored = readBrowserValue("local", THEME_KEY);
   return (
     stored === "dark" ||
-    (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    (stored !== "light" &&
+      stored !== "dark" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches)
   );
 }
 
@@ -26,7 +52,7 @@ export function ThemeToggle() {
   function toggle() {
     const next = !dark;
     document.documentElement.dataset.theme = next ? "dark" : "light";
-    localStorage.setItem("admin-theme", next ? "dark" : "light");
+    writeBrowserValue("local", THEME_KEY, next ? "dark" : "light");
     window.dispatchEvent(new Event("admin-theme-change"));
   }
 
