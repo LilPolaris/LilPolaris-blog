@@ -57,12 +57,27 @@ npm run start -- --hostname 127.0.0.1 --port 3217
 $env:ADMIN_SMOKE_URL="http://127.0.0.1:3217"
 $env:ADMIN_SMOKE_AUTH_SECRET="local-admin-quality-test-only-2026"
 npm run smoke:quality
+npm run smoke:resilience
 ```
 
 脚本先验证本机地址、登录状态和 Mock 配置，然后检查文章列表、复制草稿、
 编辑保存、各管理页面和手机导航。结果及截图保存在系统临时目录
 `lilpolaris-admin-quality`。支持用 `ADMIN_SMOKE_OUTPUT` 指定输出目录，
 用 `EDGE_PATH` 指定浏览器路径。测试生成的浏览器会话文件仅用于该 Mock 服务。
+
+`smoke:resilience` 使用相同的本机地址、Mock 配置和会话检查，验证浏览器禁用
+localStorage/sessionStorage/IndexedDB 后的编辑保存，以及图片已写入但响应丢失时的
+上传队列恢复。测试把原生 XHR 的 60 秒超时加速为 1.5 秒；产品仍使用 60 秒。
+结果及截图默认保存在系统临时目录 `lilpolaris-admin-resilience`。
+
+浏览器存储不可用时，主题、编辑器模式和一次性提示退化为当前页面内存保存；
+刷新页面后可能重置。文章恢复副本仍由 IndexedDB 管理，失败会提示及时远程保存。
+上传结果不确定时，请先点击“刷新媒体库”核对已上传图片，再决定是否重试；
+刷新会保留上传队列，系统不会自动重传结果不确定的图片。
+
+Vercel 的忽略构建步骤比较 `VERCEL_GIT_PREVIOUS_SHA` 与当前提交的整个 `admin/`
+目录，避免一次推送多个提交或合并提交时漏掉后台修改。没有可用基线、浅克隆缺少
+历史或 Git 检查失败时均执行构建。
 
 完整上传 smoke 必须连接 Mock 服务；脚本会先读取设置并拒绝对真实仓库执行：
 
