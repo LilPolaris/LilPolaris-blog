@@ -8,21 +8,34 @@ on:
       - "admin/**"
       - ".github/workflows/admin-ci.yml"
   workflow_dispatch:
+  issue_comment:
+    types: [created, edited, deleted]
+  issues:
+    types: [edited, closed, reopened, deleted, labeled, unlabeled]
 
 concurrency:
   group: hexo-deploy
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    if: >-
+      github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.comment.user.login == github.repository_owner &&
+       contains(github.event.issue.labels.*.name, 'guestbook')) ||
+      (github.event_name == 'issues' &&
+       (contains(github.event.issue.labels.*.name, 'guestbook') || github.event.label.name == 'guestbook'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: read
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
         with:
+          ref: main
           submodules: recursive
 
       - name: Setup Node.js
@@ -35,7 +48,12 @@ jobs:
         run: npm ci
 
       - name: Build site
-        run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --test tools/guestbook.test.mjs
+          node tools/export-guestbook.mjs
+          npm run build
 
       - name: Configure deploy key
         env:
