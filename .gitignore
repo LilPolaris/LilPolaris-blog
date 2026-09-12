@@ -15,3 +15,5 @@ admin/coverage/
 admin/.launcher/
 *.tsbuildinfo
 .vercel/
+# Generated from reviewed GitHub submissions before deployment.
+.guestbook-cache.json
