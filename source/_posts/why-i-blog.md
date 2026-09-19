@@ -1,5 +1,6 @@
 ---
 title: 我为什么要写博客
+sticky: 1
 tags:
   - 博客
 categories:
