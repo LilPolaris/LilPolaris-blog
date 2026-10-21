@@ -18,13 +18,6 @@ nav:
   fixed: true
 
 menu:
-  首页: / || fas fa-home
-  教程: /categories/%E6%95%99%E7%A8%8B/ || fas fa-compass
-  校园: /categories/%E6%A0%A1%E5%9B%AD/ || fas fa-graduation-cap
-  随笔: /categories/%E9%9A%8F%E7%AC%94/ || fas fa-pen-nib
-  归档: /archives/ || fas fa-archive
-  留言墙: /guestbook/ || fas fa-paint-brush
-  关于: /about/ || fas fa-user
 
 # --------------------------------------
 # Code Blocks Settings
@@ -33,7 +26,7 @@ menu:
 code_blocks:
   # Code block theme: darker / pale night / light / ocean / false
   theme: light
-  macStyle: true
+  macStyle: false
   # Code block height limit (unit: px)
   height_limit: 520
   word_wrap: true
@@ -49,11 +42,10 @@ code_blocks:
 # Formal:
 #   icon: link || the description || color
 social:
-   fab fa-github: https://github.com/LilPolaris || Github || '#24292e'
-   fab fa-bilibili: https://space.bilibili.com/321608204 || Bilibili || '#fb7299'
+   fab fa-github: https://github.com/LilPolaris || Github
+   fab fa-bilibili: https://space.bilibili.com/321608204 || Bilibili
    #fas fa-envelope: mailto:你的邮箱@qq.com || Email || '#4a7dbe'
-   fab fa-steam: https://steamcommunity.com/profiles/76561199467487592 || Steam || '#171a21'
-   fas fa-rss: /atom.xml || RSS || '#d97706'
+   fab fa-steam: https://steamcommunity.com/profiles/76561199467487592 || Steam
   # fas fa-envelope: mailto:xxxxxx@gmail.com || Email || '#4a7dbe'
 
 # --------------------------------------
@@ -67,7 +59,7 @@ avatar:
   effect: true
 
 # Disable all banner images
-disable_top_img: false
+disable_top_img: true
 
 # If the banner of page not setting, it will show the default_top_img
 default_top_img:
@@ -158,7 +150,7 @@ index_top_img_height: 70vh
 subtitle:
   enable: true
   # Typewriter Effect
-  effect: true
+  effect: false
   # Customize typed.js
   # https://github.com/mattboldt/typed.js/#customization
   typed_option:
@@ -233,7 +225,7 @@ toc:
   scroll_percent: true
 
 post_copyright:
-  enable: true
+  enable: false
   decode: false
   author_href:
   license: CC BY-NC-SA 4.0
@@ -241,7 +233,7 @@ post_copyright:
 
 # Sponsor/reward
 reward:
-  enable: true
+  enable: false
   text: 如果这篇文章帮到了你，欢迎请我喝杯奶茶。
   QR_code:
     - img: /img/wechatpay.jpg
@@ -259,7 +251,7 @@ post_edit:
 
 # Related Articles
 related_post:
-  enable: true
+  enable: false
   # Number of posts displayed
   limit: 6
   # Choose: created / updated
@@ -303,7 +295,7 @@ footer:
 # --------------------------------------
 
 aside:
-  enable: true
+  enable: false
   hide: false
   # Show the button to hide the aside in bottom right button
   button: true
@@ -549,7 +541,7 @@ share:
   # Share.js
   # https://github.com/overtrue/share.js
   sharejs:
-    sites: facebook,x,wechat,weibo,qq
+    sites: wechat,weibo,qq,facebook,x
 
   # AddToAny
   # https://www.addtoany.com/
@@ -1110,10 +1102,17 @@ css_prefix: true
 # Insert the code to head (before '</head>' tag) and the bottom (before '</body>' tag)
 inject:
   head:
-    - '<link rel="stylesheet" href="/css/site-polish.css">'
+    - '<link rel="stylesheet" href="/css/polaris-base.css">'
+    - '<link rel="stylesheet" href="/css/polaris-home.css">'
+    - '<link rel="stylesheet" href="/css/polaris-article.css">'
+    - '<link rel="stylesheet" href="/css/polaris-zine.css">'
+    - '<link rel="stylesheet" href="/css/polaris-manuscript.css">'
   bottom:
     - '<script defer src="/js/site-accessibility.js"></script>'
     - '<script defer src="/js/reading-tools.js"></script>'
+    - '<script defer src="/js/polaris-shell.js"></script>'
+    - '<script defer src="/js/polaris-theme-picker.js"></script>'
+    - '<script defer src="/js/polaris-share.js"></script>'
 
 
 # CDN Settings

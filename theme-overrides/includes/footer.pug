@@ -1,0 +1,29 @@
+//- Polaris: two quiet lines. Visitor numbers come from busuanzi (vercount);
+//- polaris-shell.js fills the running days on every page type.
+-
+  const latest = site.posts.sort('date', -1).first()
+  const since = theme.footer.owner.since
+  const year = new Date().getFullYear()
+.polaris-footer
+  .polaris-footer__row
+    nav.polaris-footer__links(aria-label="站内页面")
+      a(href=url_for('/archives/')) 归档
+      a(href=url_for('/guestbook/')) 留言墙
+      a(href=url_for('/about/')) 关于
+    p.polaris-footer__stats
+      span= `${site.posts.length} 篇文章`
+      span.polaris-stat
+        | ，
+        span#busuanzi_value_site_uv
+        |  位访客
+      span.polaris-stat
+        | ，
+        span#busuanzi_value_site_pv
+        |  次浏览
+  .polaris-footer__row
+    p.polaris-footer__copyright= since && since != year ? `© ${since}–${year} ${config.author}` : `© ${year} ${config.author}`
+    p.polaris-footer__runtime
+      = '已运行 '
+      span#polaris-runtime(data-since=theme.aside.card_webinfo.runtime_date)
+      if latest
+        = `，${date(latest.date, 'M 月 D 日')}更新`

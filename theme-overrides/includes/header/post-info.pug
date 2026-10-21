@@ -1,0 +1,19 @@
+//- Polaris: the title written on the page, then one quiet line of meta.
+- const topCategories = page.categories.data.filter(item => !item.parent)
+#post-info
+  h1.post-title= page.title || _p('no_title')
+  #post-meta.polaris-post-meta
+    time(datetime=date_xml(page.date))= date(page.date, 'YYYY 年 M 月 D 日')
+    if polaris_is_tutorial(page)
+      span
+        = '更新于 '
+        time(datetime=date_xml(page.updated))= date(page.updated, 'YYYY 年 M 月 D 日')
+    each item in topCategories
+      a(href=url_for(item.path))= item.name
+    if theme.wordcount.enable
+      span= `${wordcount(page.content)} 字`
+      span= `约 ${min2read(page.content, {cn: 350, en: 160})} 分钟`
+    if theme.busuanzi.page_pv
+      span.polaris-stat
+        span#busuanzi_value_page_pv
+        = ' 次浏览'

@@ -38,18 +38,43 @@
     const line = () => scrollY + 100
     const topOf = element => element.getBoundingClientRect().top + scrollY
     const isLong = () => article.textContent.trim().length >= 1000 || article.offsetHeight > innerHeight * 2
-    const toolbar = document.createElement('div')
-    toolbar.id = 'polaris-reading-tools'
-    toolbar.setAttribute('role', 'group')
-    toolbar.setAttribute('aria-label', '正文字号')
-    const label = document.createElement('span')
-    label.textContent = '正文字号'
-    toolbar.append(label)
-    article.before(toolbar)
+    // The font size control is a popover opened from the right-side column.
+    const toggle = document.getElementById('polaris-font-size')
+    const panel = document.createElement('div')
+    panel.id = 'polaris-font-size-panel'
+    panel.className = 'polaris-popover'
+    panel.hidden = true
+    panel.setAttribute('role', 'group')
+    panel.setAttribute('aria-label', '正文字号')
+    document.body.append(panel)
+    const focusArticle = () => {
+      if (!article.hasAttribute('tabindex')) article.tabIndex = -1
+      article.focus({ preventScroll: true })
+    }
+    const closePanel = (restoreFocus = false) => {
+      if (panel.hidden) return
+      panel.hidden = true
+      toggle?.setAttribute('aria-expanded', 'false')
+      if (restoreFocus) toggle?.focus()
+    }
+    if (toggle) {
+      on(toggle, 'click', () => {
+        const open = panel.hidden
+        panel.hidden = !open
+        toggle.setAttribute('aria-expanded', String(open))
+        if (open) panel.querySelector('[aria-pressed="true"]')?.focus()
+      })
+      on(document, 'click', event => {
+        if (!event.target.closest('#polaris-font-size-panel, #polaris-font-size')) closePanel()
+      })
+      on(document, 'keydown', event => {
+        if (event.key === 'Escape') closePanel(true)
+      })
+    }
 
     const applyFont = () => {
       article.style.setProperty('--polaris-reading-size', `${fontSize}px`)
-      toolbar.querySelectorAll('button').forEach(button => {
+      panel.querySelectorAll('button').forEach(button => {
         button.setAttribute('aria-pressed', String(Number(button.dataset.size) === fontSize))
       })
     }
@@ -63,8 +88,9 @@
         fontSize = size
         applyFont()
         try { localStorage.setItem(fontKey, String(size)) } catch { /* Optional persistence. */ }
+        closePanel(true)
       })
-      toolbar.append(button)
+      panel.append(button)
     })
     applyFont()
 
@@ -133,8 +159,8 @@
       notice.append(message)
       const actions = [
         ['继续上次阅读', () => { closeNotice(); restore(saved); interacted = true; save() }],
-        ['从头阅读', () => { closeNotice(); update(null); interacted = false; window.scrollTo({ top: 0, behavior: 'instant' }); toolbar.querySelector('button').focus({ preventScroll: true }) }],
-        ['暂不恢复', () => { closeNotice(); toolbar.querySelector('button').focus({ preventScroll: true }) }]
+        ['从头阅读', () => { closeNotice(); update(null); interacted = false; window.scrollTo({ top: 0, behavior: 'instant' }); focusArticle() }],
+        ['暂不恢复', () => { closeNotice(); focusArticle() }]
       ]
       actions.forEach(([text, action]) => {
         const button = document.createElement('button')
@@ -156,14 +182,14 @@
       if (event.key === 'Escape' && pending) {
         const hadFocus = notice.contains(document.activeElement)
         closeNotice()
-        if (hadFocus) toolbar.querySelector('button').focus({ preventScroll: true })
+        if (hadFocus) focusArticle()
       }
     })
     dispose = () => {
       save()
       clearTimeout(timer)
       controller.abort()
-      toolbar.remove()
+      panel.remove()
       notice?.remove()
       dispose = () => {}
     }

@@ -1,0 +1,156 @@
+/* Home: title, social icons and a vertical quote, then a table of contents.
+   Zine and manuscript decorations live in their own stylesheets. */
+
+.polaris-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: start;
+  padding: 44px 0 48px;
+}
+
+.polaris-hero__sky {
+  position: absolute;
+  top: -80px;
+  left: -24px;
+  display: none;
+  width: calc(100% + 48px);
+  height: 320px;
+  fill: var(--p-star);
+  pointer-events: none;
+}
+
+html[data-theme="dark"] .polaris-hero__sky { display: block; }
+
+html[data-polaris-theme="zine"] .polaris-hero__sky,
+html[data-polaris-theme="manuscript"] .polaris-hero__sky { display: none; }
+
+.polaris-hero__polaris-halo { opacity: 0.08; }
+
+.polaris-hero__polaris { opacity: 0.95; }
+
+.polaris-hero__main { position: relative; }
+
+.polaris-hero__zine-star,
+.polaris-hero__manuscript,
+.polaris-toc__label,
+.polaris-toc__circle { display: none; }
+
+.polaris-hero__title {
+  margin: 0;
+  color: var(--p-ink);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+}
+
+.polaris-hero__social {
+  display: flex;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+html[data-theme] .polaris-hero__social .social-icon {
+  margin: 0;
+  color: var(--p-muted);
+  font-size: 17px;
+}
+
+html[data-theme] .polaris-hero__social .social-icon:hover { color: var(--p-accent); }
+
+.polaris-hero__quote {
+  position: relative;
+  color: color-mix(in srgb, var(--p-ink) 80%, var(--p-bg));
+  font-size: 15px;
+}
+
+.polaris-hero__quote.is-vertical {
+  display: flex;
+  flex-direction: column;
+  writing-mode: vertical-rl;
+  line-height: 2.1;
+  letter-spacing: 0.32em;
+}
+
+.polaris-hero__quote.is-horizontal {
+  max-width: 16em;
+  line-height: 1.8;
+  text-align: right;
+}
+
+/* Table of contents. */
+.polaris-toc__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.polaris-toc__row {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  gap: 0 12px;
+  align-items: baseline;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--p-line);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.polaris-toc__row:last-child { border-bottom: 0; }
+
+.polaris-toc__date {
+  position: relative;
+  color: var(--p-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.polaris-toc__title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+html[data-theme] .polaris-toc__title a { color: var(--p-ink); }
+
+html[data-theme] .polaris-toc__title a:hover { color: var(--p-accent); }
+
+.polaris-toc__sticky {
+  margin-left: 0.6em;
+  color: var(--p-muted);
+  font-size: 12px;
+}
+
+html[data-theme] .polaris-toc__category {
+  color: var(--p-muted);
+  font-size: 12px;
+}
+
+html[data-theme] .polaris-toc__category:hover { color: var(--p-accent); }
+
+.polaris-toc__year {
+  padding: 24px 0 6px;
+  color: var(--p-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .polaris-hero { padding: 24px 0 36px; }
+
+  .polaris-hero__title span { display: block; }
+
+  /* A horizontal (non-Chinese) quote moves under the title on phones. */
+  .polaris-hero__quote.is-horizontal {
+    grid-column: 1 / -1;
+    max-width: none;
+    text-align: left;
+  }
+
+  /* Keep titles clear of the right-side button column. */
+  .polaris-toc { padding-right: 36px; }
+
+  .polaris-toc__row { grid-template-columns: 48px minmax(0, 1fr); }
+
+  html[data-theme] .polaris-toc__category { grid-column: 2; }
+}

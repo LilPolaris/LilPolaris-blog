@@ -1,0 +1,65 @@
+//- Polaris article: single column, then tags with a folded share button, a
+//- one-line licence, the series list, previous/next and comments.
+extends includes/layout.pug
+
+block content
+  -
+    const isTutorial = polaris_is_tutorial(page)
+    const series = page.series ? (groupPosts()[page.series] || []).slice().sort((a, b) => a.date - b.date) : []
+
+  #post
+    include includes/header/post-info.pug
+
+    article#article-container.container.post-content
+      if isTutorial && theme.noticeOutdate.enable && page.noticeOutdate !== false
+        include includes/post/outdate-notice.pug
+      else
+        !=page.content
+
+    if showToc
+      include includes/widget/card_post_toc.pug
+
+    .polaris-post-end
+      .polaris-post-end__row
+        if page.tags.length
+          p.polaris-post-end__tags
+            span.polaris-post-end__label 标签
+            each item in page.tags.data
+              a(href=url_for(item.path))= item.name
+        if theme.share.use
+          .polaris-share
+            #polaris-share-icons(hidden)
+              include includes/third-party/share/index.pug
+            button#polaris-share-toggle(type="button" title="分享" aria-label="分享" aria-expanded="false" aria-controls="polaris-share-icons")
+              i.fas.fa-share-nodes
+      p.polaris-post-end__license
+        = '本文采用 '
+        a(href=theme.post_copyright.license_url rel="license noopener" target="_blank")= theme.post_copyright.license
+        = ' 许可'
+
+    if series.length > 1
+      nav.polaris-series(aria-label="本系列")
+        p.polaris-series__title= `本系列：${page.series}`
+        ol
+          each item in series
+            li
+              if item.path === page.path
+                span(aria-current="page")= item.title
+              else
+                a(href=url_for(item.path))= item.title
+
+    //- In Hexo, page.prev is the older post and page.next the newer one.
+    if page.prev || page.next
+      nav.polaris-post-nav(aria-label="上一篇和下一篇")
+        if page.prev
+          a.polaris-post-nav__prev(href=url_for(page.prev.path))
+            span.polaris-post-nav__label 上一篇
+            span.polaris-post-nav__title= page.prev.title
+        if page.next
+          a.polaris-post-nav__next(href=url_for(page.next.path))
+            span.polaris-post-nav__label 下一篇
+            span.polaris-post-nav__title= page.next.title
+
+    if page.comments !== false && theme.comments.use
+      - var commentsJsLoad = true
+      !=partial('includes/third-party/comments/index', {}, {cache: true})

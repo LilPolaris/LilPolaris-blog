@@ -1,0 +1,347 @@
+/* Shell shared by every page and theme. Colours and fonts come from
+   /css/polaris-tokens.css (generated from source/_data/polaris-themes.json). */
+
+html[data-theme] {
+  --global-bg: var(--p-bg);
+  --font-color: var(--p-ink);
+  --text-highlight-color: var(--p-ink);
+  --card-bg: var(--p-bg);
+  --card-box-shadow: none;
+  --card-hover-box-shadow: none;
+  --card-meta: var(--p-muted);
+  --btn-bg: var(--p-bg);
+  --btn-color: var(--p-muted);
+  --btn-hover-color: var(--p-accent);
+  --btn-default-color: var(--p-accent);
+  --default-bg-color: var(--p-accent);
+  --hr-border: var(--p-line);
+  --hr-before-color: var(--p-accent);
+  --search-bg: var(--p-bg);
+  --search-input-color: var(--p-ink);
+  --search-a-color: var(--p-ink);
+  --sidebar-bg: var(--p-bg);
+  --blockquote-bg: transparent;
+  --blockquote-color: var(--p-muted);
+  --toc-link-color: var(--p-muted);
+  --scrollbar-color: var(--p-line);
+  --light-grey: var(--p-line);
+  --dark-grey: var(--p-muted);
+  --pseudo-hover: var(--p-accent);
+  --headline-presudo: var(--p-accent);
+  --text-bg-hover: color-mix(in srgb, var(--p-accent) 12%, transparent);
+  --mark-bg: color-mix(in srgb, var(--p-accent) 24%, transparent);
+  --zoom-bg: var(--p-bg);
+  --at-color-meta: var(--p-muted);
+  --at-color-grey: var(--p-muted);
+  --hl-bg: color-mix(in srgb, var(--p-ink) 5%, var(--p-bg));
+  --hl-color: var(--p-ink);
+  --hltools-bg: color-mix(in srgb, var(--p-ink) 8%, var(--p-bg));
+  --hltools-color: var(--p-muted);
+  --hlnumber-bg: color-mix(in srgb, var(--p-ink) 5%, var(--p-bg));
+  --hlnumber-color: var(--p-muted);
+  --hlscrollbar-bg: var(--p-line);
+  --hlexpand-bg: linear-gradient(180deg, transparent, var(--hl-bg));
+  background: var(--p-bg);
+}
+
+html[data-theme] body,
+html[data-theme] #body-wrap {
+  background: var(--p-bg);
+  color: var(--p-ink);
+  font-family: var(--p-font-body);
+}
+
+#web_bg { display: none; }
+
+::selection {
+  background: color-mix(in srgb, var(--p-accent) 26%, transparent);
+  color: inherit;
+}
+
+html[data-theme] a { color: inherit; }
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--p-accent);
+  outline-offset: 2px;
+}
+
+/* Top bar: home link on the left (not on home), search icon on the right. */
+html[data-theme] #page-header,
+html[data-theme] #page-header.not-top-img {
+  margin-bottom: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-theme] #page-header #nav,
+html[data-theme] #page-header.nav-fixed #nav,
+html[data-theme] #page-header.not-top-img #nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: auto;
+  padding: 18px 28px;
+  background: var(--p-bg);
+  border-bottom: 1px solid transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+html[data-theme] #page-header.nav-fixed #nav { border-bottom-color: var(--p-line); }
+
+html[data-theme] #nav .polaris-home-link {
+  color: var(--p-ink);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+
+html[data-theme] #nav #menus { margin-left: auto; }
+
+html[data-theme] #nav #search-button .search {
+  padding: 6px;
+  border: 0;
+  background: none;
+  color: var(--p-muted);
+  font-size: 17px;
+  cursor: pointer;
+}
+
+html[data-theme] #nav #search-button .search:hover { color: var(--p-accent); }
+
+/* Content column: no aside anywhere. */
+html[data-theme] #content-inner.layout {
+  display: block;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Footer: two quiet lines. */
+html[data-theme] #footer {
+  background: transparent;
+  color: var(--p-muted);
+}
+
+html[data-theme] #footer::before { display: none; }
+
+.polaris-footer {
+  max-width: 712px;
+  margin: 40px auto 0;
+  padding: 18px 0 26px;
+  border-top: 1px solid var(--p-line);
+  font-size: 12px;
+  line-height: 2;
+  text-align: left;
+}
+
+.polaris-footer__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 24px;
+}
+
+.polaris-footer__row p { margin: 0; }
+
+.polaris-footer__links {
+  display: flex;
+  gap: 1em;
+}
+
+.polaris-footer__links a { color: var(--p-ink); }
+
+.polaris-footer__links a:hover { color: var(--p-accent); }
+
+.polaris-stat:has(> span:empty) { display: none; }
+
+@media (max-width: 760px) {
+  .polaris-footer { margin-right: 24px; margin-left: 24px; }
+}
+
+/* Right-side column stays visible; Butterfly normally fades it in on scroll. */
+html[data-theme] #rightside {
+  right: 16px;
+  bottom: 40px;
+  opacity: 1;
+  transform: none;
+}
+
+html[data-theme] #rightside > div > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 8px;
+  border: 1px solid var(--p-line);
+  border-radius: 50%;
+  background: var(--p-bg);
+  color: var(--p-muted);
+  font-size: 15px;
+}
+
+html[data-theme] #rightside > div > button:hover { color: var(--p-accent); }
+
+html[data-theme] #rightside #go-up .scroll-percent { display: none; }
+
+/* Popovers opened from the right-side column. */
+.polaris-popover {
+  position: fixed;
+  right: 62px;
+  bottom: 40px;
+  z-index: 101;
+  display: grid;
+  gap: 2px;
+  min-width: 132px;
+  padding: 8px;
+  border: 1px solid var(--p-line);
+  border-radius: 10px;
+  background: var(--p-bg);
+  color: var(--p-ink);
+  font-family: var(--p-font-body);
+}
+
+.polaris-popover[hidden] { display: none; }
+
+.polaris-popover button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.polaris-popover button:hover { background: color-mix(in srgb, var(--p-accent) 10%, transparent); }
+
+.polaris-popover button[aria-pressed="true"] { color: var(--p-accent); }
+
+.polaris-theme-option > span:first-child { flex: 1; }
+
+.polaris-theme-option__swatch {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--p-line);
+  border-radius: 50%;
+}
+
+/* Search dialog. */
+html[data-theme] .search-dialog {
+  border: 1px solid var(--p-line);
+  border-radius: 12px;
+  background: var(--p-bg);
+  box-shadow: none;
+  font-family: var(--p-font-body);
+}
+
+html[data-theme] .local-search-input input,
+html[data-theme] #local-search-input {
+  border-color: var(--p-line);
+  background: var(--p-bg);
+  color: var(--p-ink);
+}
+
+html[data-theme] #search-mask { background: color-mix(in srgb, var(--p-bg) 70%, transparent); }
+
+/* Pagination. */
+html[data-theme] #pagination .page-number,
+html[data-theme] #pagination .extend {
+  border-radius: 0;
+  background: none;
+  color: var(--p-muted);
+  box-shadow: none;
+}
+
+html[data-theme] #pagination .page-number.current,
+html[data-theme] #pagination .page-number:hover,
+html[data-theme] #pagination .extend:hover {
+  background: none;
+  color: var(--p-accent);
+  box-shadow: inset 0 -1px 0 var(--p-accent);
+}
+
+/* Tags page: plain words with a quiet count. */
+html[data-theme] .tag-cloud-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  text-align: left;
+}
+
+html[data-theme] .tag-cloud-list a {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none !important;
+  color: var(--p-ink) !important;
+  font-size: 15px !important;
+}
+
+html[data-theme] .tag-cloud-list a:hover { color: var(--p-accent) !important; }
+
+html[data-theme] .tag-cloud-list .tag-count {
+  margin-left: 0.3em;
+  color: var(--p-muted);
+  font-size: 12px;
+}
+
+/* Categories page. */
+html[data-theme] .category-lists .category-list { padding-left: 0; }
+
+html[data-theme] .category-lists .category-list-item {
+  margin: 0 0 10px;
+  list-style: none;
+}
+
+html[data-theme] .category-lists .category-list-item::before { display: none; }
+
+html[data-theme] .category-lists .category-list-link { color: var(--p-ink); }
+
+html[data-theme] .category-lists .category-list-link:hover { color: var(--p-accent); }
+
+html[data-theme] .category-lists .category-list-count {
+  margin-left: 0.4em;
+  color: var(--p-muted);
+  font-size: 12px;
+}
+
+html[data-theme] .category-lists .category-list-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 6px 0 0;
+  padding-left: 1.2em;
+}
+
+/* Scrollbar. */
+html[data-theme] { scrollbar-color: var(--p-line) var(--p-bg); }
+
+html[data-theme] ::-webkit-scrollbar-thumb { background: var(--p-line); }
+
+html[data-theme] ::-webkit-scrollbar-track { background: var(--p-bg); }
+
+/* Phones: keep the right-side column clear of the article text. */
+@media (max-width: 600px) {
+  html[data-theme] #page-header #nav { padding: 14px 16px; }
+
+  html[data-theme] #content-inner.layout { padding: 0 16px; }
+
+  html[data-theme] #rightside { right: max(6px, env(safe-area-inset-right)); }
+
+  html[data-theme] #post { padding-right: 36px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "default": "fog",
+  "storageKey": "polaris-theme",
+  "legacyKey": "polaris-palette",
+  "legacyMap": {
+    "mint": "celadon",
+    "rose": "fog",
+    "blue": "fog",
+    "lavender": "fog",
+    "amber": "fog"
+  },
+  "themes": [
+    {
+      "id": "fog",
+      "name": "雾",
+      "light": { "bg": "#eef1f2", "ink": "#252d33", "muted": "#636d74", "accent": "#4b687b", "line": "#d6dcdf" },
+      "dark": { "bg": "#0f1825", "ink": "#d0d8e0", "muted": "#768492", "accent": "#9fb8cc", "line": "#1f2a38", "star": "#e4ebf3" },
+      "fonts": { "body": "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif" }
+    },
+    {
+      "id": "frost",
+      "name": "霜",
+      "light": { "bg": "#f5f8f9", "ink": "#1d2a31", "muted": "#61737e", "accent": "#2f7489", "line": "#dce5e8" },
+      "dark": { "bg": "#121416", "ink": "#c7cbcf", "muted": "#7a8186", "accent": "#a9b1b8", "line": "#23272a", "star": "#d9dde0" },
+      "fonts": { "body": "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif" }
+    },
+    {
+      "id": "celadon",
+      "name": "青瓷",
+      "light": { "bg": "#edf2f0", "ink": "#22302b", "muted": "#626f6a", "accent": "#47756a", "line": "#d3ddd9" },
+      "dark": { "bg": "#0a1c22", "ink": "#d6e4e8", "muted": "#6d8890", "accent": "#8cc6d4", "line": "#183039", "star": "#e8f6fa" },
+      "fonts": { "body": "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif" }
+    },
+    {
+      "id": "zine",
+      "name": "小志",
+      "light": { "bg": "#f4f3ef", "ink": "#2c4f9e", "muted": "#4d6bb2", "accent": "#2c4f9e", "line": "#9fb0d8", "spot": "#ffc52e" },
+      "dark": { "bg": "#1b2440", "ink": "#ece6d8", "muted": "#a9b0c4", "accent": "#ffc52e", "line": "#3a4670", "spot": "#ffc52e", "star": "#fff3c4" },
+      "fonts": { "body": "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif", "hand": "'Long Cang', cursive" }
+    },
+    {
+      "id": "manuscript",
+      "name": "稿纸",
+      "light": { "bg": "#fcfcf9", "ink": "#22324f", "muted": "#5c796c", "accent": "#2f6b52", "line": "#cfe3d8", "grid": "#79ad93", "gridSoft": "#cfe3d8" },
+      "dark": { "bg": "#12201a", "ink": "#e9e4d6", "muted": "#9db3a6", "accent": "#a7d3b9", "line": "#2a3d33", "grid": "#5f8f78", "gridSoft": "#2a3d33", "star": "#e9e4d6" },
+      "fonts": { "body": "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif", "hand": "'Ma Shan Zheng', cursive" }
+    }
+  ]
+}

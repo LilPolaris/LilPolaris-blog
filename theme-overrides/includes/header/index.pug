@@ -1,0 +1,11 @@
+//- Polaris: no top image anywhere; the home hero and post title are rendered
+//- by index.pug and post-info.pug, so only other pages need the SEO heading.
+-
+  const isFixedClass = theme.nav.fixed ? ' fixed' : ''
+  var top_img = false
+  var bg_img = ''
+
+header#page-header(class=`not-top-img${isFixedClass}` data-polaris-override="header")
+  include ./nav.pug
+  if globalPageType !== 'post' && globalPageType !== 'home'
+    h1.title-seo=page.title || page.tag || page.category || config.title
