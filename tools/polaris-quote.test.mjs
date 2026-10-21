@@ -3,7 +3,27 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const { splitQuoteColumns, layoutManuscript } = require('../source/js/polaris-quote-core.js')
+const { splitQuoteColumns, layoutManuscript, quoteRowCount, pickNextIndex } = require('../source/js/polaris-quote-core.js')
+
+test('pickNextIndex never repeats the current quote', () => {
+  assert.equal(pickNextIndex(5, 2, () => 0), 0)
+  assert.equal(pickNextIndex(5, 2, () => 0.5), 3)
+  assert.equal(pickNextIndex(5, 2, () => 0.99), 4)
+  assert.equal(pickNextIndex(5, 0, () => 0), 1)
+  assert.equal(pickNextIndex(1, 0, () => 0.7), 0)
+})
+
+test('quoteRowCount counts the rows a quote fills on manuscript paper', () => {
+  assert.equal(quoteRowCount('玻璃晴朗，橘子辉煌', 20), 1)
+  assert.equal(quoteRowCount('在隆冬，我终于得知，我身上有一个不可战胜的夏天', 20), 2)
+  assert.equal(quoteRowCount('在隆冬，我终于得知，我身上有一个不可战胜的夏天', 12), 3)
+})
+
+test('manuscript pads short quotes with blank rows so the grid keeps its height', () => {
+  const rows = layoutManuscript({ title: "Lil Polaris'Booook", quote: '玻璃晴朗，橘子辉煌', columns: 20, minQuoteRows: 2 })
+  assert.equal(rows.length, 4)
+  assert.ok(rows[3].every(cell => cell === ''))
+})
 
 test('vertical quotes break at commas and drop the break punctuation', () => {
   assert.deepEqual(splitQuoteColumns('玻璃晴朗，橘子辉煌'), ['玻璃晴朗', '橘子辉煌'])

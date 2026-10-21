@@ -66,6 +66,13 @@ html[data-theme] .polaris-hero__social .social-icon:hover { color: var(--p-accen
   font-size: 15px;
 }
 
+/* Quotes rotate with a slow fade (timing in polaris-home.js). */
+.polaris-hero__quote,
+.polaris-hero__manuscript { transition: opacity 1.5s ease; }
+
+.polaris-hero.is-fading .polaris-hero__quote,
+.polaris-hero.is-fading .polaris-hero__manuscript { opacity: 0; }
+
 .polaris-hero__quote.is-vertical {
   display: flex;
   flex-direction: column;

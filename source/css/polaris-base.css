@@ -148,9 +148,13 @@ html[data-theme] #footer::before { display: none; }
   gap: 1em;
 }
 
-.polaris-footer__links a { color: var(--p-ink); }
+/* Butterfly colours `#footer > *` and `#footer a` with --light-grey, which
+   maps to the hairline colour here, so these need the #footer prefix. */
+html[data-theme] #footer > .polaris-footer { color: var(--p-muted); }
 
-.polaris-footer__links a:hover { color: var(--p-accent); }
+html[data-theme] #footer .polaris-footer__links a { color: var(--p-ink); }
+
+html[data-theme] #footer .polaris-footer__links a:hover { color: var(--p-accent); }
 
 .polaris-stat:has(> span:empty) { display: none; }
 

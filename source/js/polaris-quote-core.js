@@ -44,13 +44,35 @@
     return rows
   }
 
-  // Rows of `columns` cells: the title one character per cell, a blank row,
-  // then the quote indented two cells.
-  function layoutManuscript (options) {
-    var blank = new Array(options.columns).fill('')
-    return wrap(toCells(options.title), options.columns)
-      .concat([blank], wrap(['', ''].concat(toCells(options.quote)), options.columns))
+  function quoteRows (quote, columns) {
+    return wrap(['', ''].concat(toCells(quote)), columns)
   }
 
-  return { splitQuoteColumns: splitQuoteColumns, layoutManuscript: layoutManuscript }
+  function quoteRowCount (quote, columns) {
+    return quoteRows(quote, columns).length
+  }
+
+  // Rows of `columns` cells: the title one character per cell, a blank row,
+  // then the quote indented two cells, padded with blank rows up to
+  // `minQuoteRows` so rotating quotes keep the grid the same height.
+  function layoutManuscript (options) {
+    var blank = function () { return new Array(options.columns).fill('') }
+    var body = quoteRows(options.quote, options.columns)
+    while (body.length < (options.minQuoteRows || 0)) body.push(blank())
+    return wrap(toCells(options.title), options.columns).concat([blank()], body)
+  }
+
+  // A random index other than `current`, so the same quote never shows twice in a row.
+  function pickNextIndex (length, current, random) {
+    if (length < 2) return 0
+    var next = Math.floor((random || Math.random)() * (length - 1))
+    return next >= current ? next + 1 : next
+  }
+
+  return {
+    splitQuoteColumns: splitQuoteColumns,
+    layoutManuscript: layoutManuscript,
+    quoteRowCount: quoteRowCount,
+    pickNextIndex: pickNextIndex
+  }
 }))
