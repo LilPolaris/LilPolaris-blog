@@ -1,0 +1,354 @@
+/* Article page: one centred column of about 38 Chinese characters. */
+
+html[data-theme] #post {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-theme] #post #post-info { margin: 48px 0 40px; }
+
+html[data-theme] #post #post-info .post-title {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--p-ink);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.polaris-post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1em;
+  margin-top: 12px;
+  color: var(--p-muted);
+  font-size: 13px;
+  line-height: 2;
+}
+
+html[data-theme] .polaris-post-meta a { color: var(--p-muted); }
+
+html[data-theme] .polaris-post-meta a:hover { color: var(--p-accent); }
+
+/* Body text. */
+html[data-theme] #post #article-container {
+  color: var(--p-ink);
+  font-size: var(--polaris-reading-size, 16px);
+  line-height: 2;
+}
+
+html[data-theme] #article-container p { margin: 0 0 1.1em; }
+
+html[data-theme] #article-container :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--p-ink);
+  font-weight: 500;
+}
+
+html[data-theme] #article-container :is(h1, h2, h3, h4, h5, h6)::before { display: none; }
+
+html[data-theme] #article-container :is(h1, h2, h3, h4, h5, h6) { padding-left: 0; }
+
+html[data-theme] #article-container a {
+  color: var(--p-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+html[data-theme] #article-container blockquote {
+  margin: 0 0 1.1em;
+  padding: 0.2em 1em;
+  border-left: 2px solid var(--p-line);
+  background: none;
+  color: var(--p-muted);
+}
+
+html[data-theme] #article-container :not(pre) > code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--p-ink) 7%, var(--p-bg));
+  color: var(--p-ink);
+}
+
+html[data-theme] #article-container figure.highlight {
+  border: 1px solid var(--p-line);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+html[data-theme] #article-container table,
+html[data-theme] #article-container :is(th, td) { border-color: var(--p-line); }
+
+html[data-theme] #article-container img { border-radius: 4px; }
+
+/* A small four-point star in place of Butterfly's hr icon. */
+html[data-theme] #article-container hr {
+  position: relative;
+  height: 14px;
+  margin: 2.4em auto;
+  border: 0;
+  background: none;
+}
+
+html[data-theme] #article-container hr::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin: 0 0 0 -7px;
+  padding: 0;
+  background: var(--p-accent);
+  content: '';
+  transform: none;
+  animation: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M7 0 8.2 5.8 14 7 8.2 8.2 7 14 5.8 8.2 0 7 5.8 5.8Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M7 0 8.2 5.8 14 7 8.2 8.2 7 14 5.8 8.2 0 7 5.8 5.8Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Notice shown on tutorials that have not been updated for a year. */
+html[data-theme] #post-outdate-notice {
+  margin-bottom: 1.6em;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--p-accent) 9%, var(--p-bg));
+  color: var(--p-ink);
+  font-size: 14px;
+}
+
+html[data-theme] #post-outdate-notice::before { display: none; }
+
+/* Contents: a popover opened from the right-side column. */
+html[data-theme] #post #card-toc {
+  position: fixed;
+  right: 62px;
+  bottom: 40px;
+  z-index: 101;
+  width: min(320px, calc(100vw - 88px));
+  max-height: 60vh;
+  margin: 0;
+  padding: 14px 16px;
+  overflow: auto;
+  border: 1px solid var(--p-line);
+  border-radius: 10px;
+  background: var(--p-bg);
+  box-shadow: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: none;
+}
+
+html[data-theme] #post #card-toc.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+html[data-theme] #card-toc .item-headline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--p-ink);
+  font-size: 14px;
+}
+
+html[data-theme] #card-toc .toc-percentage {
+  margin-left: auto;
+  color: var(--p-muted);
+  font-size: 12px;
+}
+
+html[data-theme] #card-toc .toc-content { max-height: none; }
+
+html[data-theme] #card-toc .toc-link { color: var(--p-muted); }
+
+html[data-theme] #card-toc .toc-link.active {
+  background: none;
+  color: var(--p-accent);
+}
+
+/* End of article: tags, folded share, licence. */
+.polaris-post-end {
+  margin-top: 48px;
+  padding-top: 16px;
+  border-top: 1px solid var(--p-line);
+  color: var(--p-muted);
+  font-size: 13px;
+}
+
+.polaris-post-end__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-height: 32px;
+}
+
+.polaris-post-end__tags { margin: 0; }
+
+.polaris-post-end__label { margin-right: 0.6em; }
+
+html[data-theme] .polaris-post-end__tags a {
+  margin-right: 0.8em;
+  color: var(--p-ink);
+}
+
+.polaris-share {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+html[data-theme] #polaris-share-icons .post-share { margin: 0; }
+
+html[data-theme] #polaris-share-icons .social-share {
+  display: flex;
+  gap: 2px;
+}
+
+html[data-theme] #polaris-share-icons .social-share .social-share-icon {
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: var(--p-muted);
+  font-size: 17px;
+  line-height: 30px;
+}
+
+html[data-theme] #polaris-share-icons .social-share .social-share-icon:hover {
+  background: none;
+  color: var(--p-accent);
+}
+
+#polaris-share-toggle {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--p-line);
+  border-radius: 50%;
+  background: var(--p-bg);
+  color: var(--p-muted);
+  cursor: pointer;
+}
+
+#polaris-share-toggle[aria-expanded="true"],
+#polaris-share-toggle:hover { color: var(--p-accent); }
+
+.polaris-post-end__license {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+html[data-theme] .polaris-post-end__license a { color: var(--p-muted); text-decoration: underline; }
+
+/* Series and previous/next. */
+.polaris-series {
+  margin-top: 32px;
+  font-size: 14px;
+}
+
+.polaris-series__title {
+  margin: 0 0 6px;
+  color: var(--p-muted);
+  font-size: 13px;
+}
+
+.polaris-series ol { margin: 0; padding-left: 1.4em; }
+
+html[data-theme] .polaris-series a { color: var(--p-ink); }
+
+.polaris-series [aria-current="page"] { color: var(--p-muted); }
+
+.polaris-post-nav {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 32px;
+}
+
+html[data-theme] .polaris-post-nav a {
+  display: block;
+  min-width: 0;
+  color: var(--p-ink);
+}
+
+.polaris-post-nav__next { text-align: right; }
+
+.polaris-post-nav__next:only-child { grid-column: 2; }
+
+.polaris-post-nav__label {
+  display: block;
+  color: var(--p-muted);
+  font-size: 12px;
+  line-height: 2;
+}
+
+.polaris-post-nav__title {
+  display: block;
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-theme] #post #post-comment { margin-top: 40px; }
+
+html[data-theme] #post hr.custom-hr { display: none; }
+
+html[data-theme] #post-comment .comment-headline {
+  color: var(--p-muted);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+html[data-theme] #post-comment .comment-headline i { display: none; }
+
+/* Reading progress notice from reading-tools.js. */
+#polaris-reading-resume {
+  position: fixed;
+  right: max(62px, env(safe-area-inset-right));
+  bottom: max(40px, env(safe-area-inset-bottom));
+  z-index: 100;
+  width: min(320px, calc(100vw - 88px));
+  padding: 14px 16px;
+  border: 1px solid var(--p-line);
+  border-radius: 10px;
+  background: var(--p-bg);
+  color: var(--p-ink);
+  font-family: var(--p-font-body);
+  font-size: 14px;
+}
+
+#polaris-reading-resume p { margin: 0 0 8px; }
+
+#polaris-reading-resume button {
+  margin: 4px 4px 0 0;
+  padding: 6px 10px;
+  border: 1px solid var(--p-line);
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+#polaris-reading-resume button:first-of-type {
+  border-color: var(--p-accent);
+  color: var(--p-accent);
+}
+
+@media (max-width: 600px) {
+  html[data-theme] #post #post-info { margin-top: 28px; }
+
+  html[data-theme] #post #post-info .post-title { font-size: 25px; }
+}

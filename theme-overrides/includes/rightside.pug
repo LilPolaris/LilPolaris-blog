@@ -1,0 +1,23 @@
+//- Polaris: one always-visible column, top to bottom: contents, font size,
+//- reading mode, light/dark, theme, back to top. No settings cog.
+- const { readmode, darkmode } = theme
+
+#rightside
+  #rightside-config-show
+    if showToc
+      button#mobile-toc-button.close(type="button" title=_p('rightside.toc') aria-label=_p('rightside.toc'))
+        i.fas.fa-list-ul
+    if globalPageType === 'post'
+      button#polaris-font-size(type="button" title="正文字号" aria-label="正文字号" aria-haspopup="true" aria-expanded="false" aria-controls="polaris-font-size-panel")
+        i.fas.fa-text-height
+      if readmode
+        button#readmode(type="button" title=_p('rightside.readmode_title') aria-label=_p('rightside.readmode_title'))
+          i.fas.fa-book-open
+    if darkmode.enable && darkmode.button
+      button#darkmode(type="button" title=_p('rightside.night_mode_title') aria-label=_p('rightside.night_mode_title'))
+        i.fas.fa-adjust
+    button#polaris-theme-toggle(type="button" title="换主题" aria-label="换主题" aria-haspopup="true" aria-expanded="false" aria-controls="polaris-theme-panel")
+      i.fas.fa-palette
+    button#go-up(type="button" title=_p('rightside.back_to_top') aria-label=_p('rightside.back_to_top'))
+      span.scroll-percent
+      i.fas.fa-arrow-up

@@ -6,6 +6,7 @@ import ReactMarkdown, {
   type Components,
 } from "react-markdown";
 import { nodeText, previewHeadings } from "@/lib/preview-headings";
+import { splitProseLines } from "@/lib/prose-paragraphs";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -147,7 +148,7 @@ export const MarkdownPreview = memo(function MarkdownPreview({
   hideOutline?: boolean;
 }) {
   const source = useMemo(
-    () => transformAssetTags(markdown, postPath, assetUrls),
+    () => transformAssetTags(splitProseLines(markdown), postPath, assetUrls),
     [assetUrls, markdown, postPath],
   );
   const prefix = useId().replace(/[^a-zA-Z0-9_-]/g, "");

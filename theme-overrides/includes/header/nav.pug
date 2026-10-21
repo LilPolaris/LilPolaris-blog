@@ -1,0 +1,14 @@
+//- Polaris: no menu. Pages other than home get a quiet link back home; every
+//- page keeps the search button, rendered as a real button. Butterfly's
+//- main.js measures `#blog-info > a` on load, so home keeps a hidden one.
+nav#nav
+  span#blog-info
+    if globalPageType !== 'home'
+      a.polaris-home-link(href=url_for('/'))= config.title
+    else
+      a.polaris-home-link(href=url_for('/') hidden)
+  #menus
+    if theme.search.use
+      #search-button
+        button(type="button" class="site-page social-icon search" aria-label="搜索" aria-haspopup="dialog" aria-expanded="false")
+          i.fas.fa-search.fa-fw

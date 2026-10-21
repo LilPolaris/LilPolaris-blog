@@ -1,0 +1,62 @@
+/* Manuscript theme: green-ruled Chinese composition paper. polaris-home.js
+   fills .polaris-hero__manuscript and adds .is-manuscript-ready. */
+
+.polaris-sr-only,
+html[data-polaris-theme="manuscript"] .polaris-hero.is-manuscript-ready :is(.polaris-hero__title, .polaris-hero__quote) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0;
+  white-space: nowrap;
+}
+
+html[data-polaris-theme="manuscript"] .polaris-hero.is-manuscript-ready {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+html[data-polaris-theme="manuscript"] .polaris-hero.is-manuscript-ready .polaris-hero__manuscript {
+  display: block;
+  order: -1;
+}
+
+.polaris-grid__row {
+  display: grid;
+  grid-template-columns: repeat(var(--polaris-grid-columns, 20), minmax(0, 1fr));
+  margin-bottom: 7px;
+  border: 1px solid var(--p-grid);
+}
+
+.polaris-grid__row span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-left: 1px solid var(--p-grid);
+  color: var(--p-ink);
+  font-family: var(--p-font-hand);
+  font-size: clamp(14px, 3.4vw, 21px);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.polaris-grid__row span:first-child { border-left: 0; }
+
+.polaris-grid__note {
+  margin: 0;
+  color: var(--p-grid);
+  font-size: 11px;
+  text-align: right;
+}
+
+html[data-polaris-theme="manuscript"] .polaris-hero__social .social-icon { color: var(--p-ink); }
+
+html[data-polaris-theme="manuscript"] .polaris-toc__row { border-bottom-color: var(--p-grid-soft); }
+
+html[data-polaris-theme="manuscript"] .polaris-footer { border-top-color: var(--p-grid); }
+
+html[data-polaris-theme="manuscript"] #article-container hr::before { background: var(--p-grid); }

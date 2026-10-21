@@ -51,7 +51,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          node --test tools/guestbook.test.mjs
+          npm test
           node tools/export-guestbook.mjs
           npm run build
 

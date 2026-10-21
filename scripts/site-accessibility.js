@@ -14,26 +14,8 @@ const addAttribute = (tag, name, value) => {
 hexo.extend.filter.register('after_render:html', html => {
   if (!html.includes('<body')) return html
 
-  html = html.replace(
-    /<div id="search-button">\s*<span class="site-page social-icon search">([\s\S]*?)<\/span>\s*<\/div>(?=<div class="menus_items">)/,
-    '<div id="search-button"><button type="button" class="site-page social-icon search" aria-label="搜索" aria-haspopup="dialog" aria-expanded="false">$1</button></div>'
-  )
-
-  html = html.replace(
-    /<div id="toggle-menu">\s*<span class="site-page">([\s\S]*?)<\/span>\s*<\/div>/,
-    '<div id="toggle-menu"><button type="button" class="site-page menu-toggle-button" aria-label="打开导航菜单" aria-controls="sidebar-menus" aria-expanded="false">$1</button></div>'
-  )
-
-  html = html.replace(
-    '<div id="sidebar-menus">',
-    '<div id="sidebar-menus" aria-hidden="true" inert><button type="button" class="sidebar-close-button" aria-label="关闭导航菜单"><i class="fas fa-times" aria-hidden="true"></i></button>'
-  )
-
-  html = html.replace(
-    /<div id="scroll-down">([\s\S]*?)<\/div>/,
-    '<button id="scroll-down" type="button" aria-label="查看最新文章">$1</button>'
-  )
-
+  // The search button, menu, sidebar and settings cog are rendered by
+  // theme-overrides/ (or no longer exist), so only theme output is patched here.
   html = html.replace(
     '<div class="search-dialog">',
     '<div class="search-dialog" id="local-search-dialog" role="dialog" aria-modal="true" aria-labelledby="search-dialog-title" aria-hidden="true" tabindex="-1">'
@@ -53,15 +35,6 @@ hexo.extend.filter.register('after_render:html', html => {
   html = html.replace(
     '<div id="search-mask">',
     '<div id="search-mask" aria-hidden="true">'
-  )
-
-  html = html.replace(
-    '<div id="rightside-config-hide">',
-    '<div id="rightside-config-hide" aria-hidden="true" inert>'
-  )
-  html = html.replace(
-    /<button id="rightside-config"([^>]*)>/,
-    '<button id="rightside-config"$1 aria-controls="rightside-config-hide" aria-expanded="false">'
   )
 
   html = html.replace(/<a class="extend (prev|next)"([^>]*)>/g, (match, direction, rest) => {

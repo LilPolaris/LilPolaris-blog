@@ -1,0 +1,144 @@
+/* Zine theme: two-colour riso print. Blue ink, a sunflower-yellow star
+   overprinted under the title, handwriting for quote and dates, paper grain. */
+
+html[data-polaris-theme="zine"] .polaris-hero__zine-star {
+  position: absolute;
+  top: -30px;
+  left: -30px;
+  display: block;
+  width: 176px;
+  height: 176px;
+}
+
+.polaris-hero__zine-star-fill {
+  fill: var(--p-spot);
+  mix-blend-mode: multiply;
+}
+
+.polaris-hero__zine-star-line {
+  fill: none;
+  stroke: var(--p-ink);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+html[data-polaris-theme="zine"] .polaris-hero__title {
+  position: relative;
+  margin-top: 36px;
+  font-size: 44px;
+  font-weight: 500;
+  line-height: 1.12;
+  mix-blend-mode: multiply;
+}
+
+html[data-polaris-theme="zine"] .polaris-hero__title span { display: block; }
+
+html[data-polaris-theme="zine"] .polaris-hero__social { position: relative; }
+
+html[data-polaris-theme="zine"] .polaris-hero__quote {
+  color: var(--p-ink);
+  font-family: var(--p-font-hand);
+  font-size: 28px;
+  line-height: 1.6;
+  letter-spacing: 0.14em;
+}
+
+html[data-polaris-theme="zine"] .polaris-hero__quote.is-horizontal {
+  font-size: 22px;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 600px) {
+  html[data-polaris-theme="zine"] .polaris-hero__title { font-size: 34px; }
+}
+
+html[data-polaris-theme="zine"] .polaris-toc__label {
+  display: block;
+  margin: 0 0 6px;
+  color: var(--p-ink);
+  font-family: var(--p-font-hand);
+  font-size: 22px;
+}
+
+html[data-polaris-theme="zine"] .polaris-toc__row {
+  padding: 8px 0;
+  border-bottom: 0;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+}
+
+html[data-polaris-theme="zine"] .polaris-toc__date {
+  font-family: var(--p-font-hand);
+  font-size: 21px;
+}
+
+html[data-polaris-theme="zine"] .polaris-toc__date > span { position: relative; }
+
+html[data-polaris-theme="zine"] .polaris-toc__row.is-newest .polaris-toc__date { color: var(--p-ink); }
+
+html[data-polaris-theme="zine"] .polaris-toc__circle {
+  position: absolute;
+  top: -6px;
+  left: -10px;
+  display: block;
+  width: 70px;
+  height: 38px;
+  fill: none;
+  stroke: var(--p-spot);
+  stroke-width: 3;
+  stroke-linecap: round;
+  mix-blend-mode: multiply;
+}
+
+html[data-polaris-theme="zine"] .polaris-toc__year {
+  font-family: var(--p-font-hand);
+  font-size: 20px;
+}
+
+/* Hand-drawn wavy rule above the footer. */
+html[data-polaris-theme="zine"] .polaris-footer {
+  position: relative;
+  border-top: 0;
+}
+
+html[data-polaris-theme="zine"] .polaris-footer::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 8px;
+  background: var(--p-ink);
+  content: '';
+  opacity: 0.55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 8'%3E%3Cpath d='M0 4 Q15 1 30 4 T60 4' fill='none' stroke='black' stroke-width='1'/%3E%3C/svg%3E") left top / 60px 8px repeat-x;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 8'%3E%3Cpath d='M0 4 Q15 1 30 4 T60 4' fill='none' stroke='black' stroke-width='1'/%3E%3C/svg%3E") left top / 60px 8px repeat-x;
+}
+
+/* Paper grain over the whole page. */
+html[data-polaris-theme="zine"] body::after {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .2 0 0 0 0 .25 0 0 0 0 .4 0 0 0 1.4 -.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  content: '';
+  mix-blend-mode: multiply;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+/* Articles keep the single column; the divider star turns yellow. */
+html[data-polaris-theme="zine"] #article-container hr::before { background: var(--p-spot); }
+
+html[data-polaris-theme="zine"] #article-container blockquote { border-left-color: var(--p-spot); }
+
+/* Night: ink becomes cream on indigo paper; multiply would hide the star. */
+html[data-polaris-theme="zine"][data-theme="dark"] .polaris-hero__zine-star-fill,
+html[data-polaris-theme="zine"][data-theme="dark"] .polaris-hero__title,
+html[data-polaris-theme="zine"][data-theme="dark"] .polaris-toc__circle { mix-blend-mode: normal; }
+
+/* Dimmer at night so the cream title stays readable where it crosses the star. */
+html[data-polaris-theme="zine"][data-theme="dark"] .polaris-hero__zine-star-fill { opacity: 0.4; }
+
+html[data-polaris-theme="zine"][data-theme="dark"] body::after {
+  mix-blend-mode: screen;
+  opacity: 0.05;
+}

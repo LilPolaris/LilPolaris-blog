@@ -9,12 +9,17 @@
     "images": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/add-post-images.ps1",
     "new": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/new-post.ps1",
     "push": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/push-post.ps1",
-    "server": "hexo server"
+    "server": "hexo server",
+    "test": "node --test \"tools/*.test.mjs\"",
+    "test:site": "hexo clean && hexo generate && node --test tools/site-build.check.mjs"
   },
   "hexo": {
     "version": "8.1.1"
   },
   "dependencies": {
+    "@fontsource/long-cang": "^5.3.0",
+    "@fontsource/ma-shan-zheng": "^5.3.1",
+    "@fontsource/noto-serif-sc": "^5.3.1",
     "hexo": "^8.0.0",
     "hexo-butterfly-extjs": "^1.5.8",
     "hexo-deployer-git": "^4.0.0",

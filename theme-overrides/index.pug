@@ -1,0 +1,63 @@
+//- Polaris home: title, social icons and one quote, then every post as a
+//- table of contents. The quote is re-picked at random by polaris-home.js;
+//- the first one is rendered here for readers without JavaScript.
+extends includes/layout.pug
+
+block content
+  -
+    const quotes = theme.subtitle.sub || []
+    const firstQuote = quotes[0] || ''
+    const columns = polaris_quote_columns(firstQuote)
+    const sky = polaris_stars()
+    const titleParts = config.title.split(/(?<=')/)
+    const rows = polaris_toc_rows(page.posts, { markNewest: page.current === 1 })
+
+  section.polaris-hero(aria-label="首页")
+    svg.polaris-hero__sky(viewBox="0 0 680 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false")
+      each star in sky.stars
+        circle(cx=star.x cy=star.y r=star.r opacity=star.opacity)
+      circle.polaris-hero__polaris-halo(cx=sky.polaris.x cy=sky.polaris.y r="7")
+      circle.polaris-hero__polaris(cx=sky.polaris.x cy=sky.polaris.y r="1.9")
+    .polaris-hero__main
+      svg.polaris-hero__zine-star(viewBox="0 0 140 140" aria-hidden="true" focusable="false")
+        polygon.polaris-hero__zine-star-fill(points="70,9 85,48 128,51 95,79 106,119 70,95 34,121 46,77 12,50 55,49")
+        polygon.polaris-hero__zine-star-line(points="71,6 86,47 131,52 96,80 108,122 69,97 32,119 44,79 10,52 54,47" transform="translate(5 3) rotate(-5 70 70)")
+      h1.polaris-hero__title
+        each part in titleParts
+          span= part
+      .polaris-hero__social
+        !=partial('includes/header/social', {}, {cache: true})
+    .polaris-hero__quote(class=columns ? 'is-vertical' : 'is-horizontal')
+      if columns
+        each column in columns
+          span= column
+      else
+        = firstQuote
+    .polaris-hero__manuscript(aria-hidden="true")
+
+  script#polaris-quotes(type="application/json")!= JSON.stringify(quotes).replace(/</g, '\\u003c')
+
+  section.polaris-toc(aria-label="文章目录")
+    p.polaris-toc__label 最近写的
+    ol.polaris-toc__list
+      each row in rows
+        if row.type === 'year'
+          li.polaris-toc__year= row.year
+        else
+          li.polaris-toc__row(class=row.newest ? 'is-newest' : undefined)
+            span.polaris-toc__date
+              if row.newest
+                svg.polaris-toc__circle(viewBox="0 0 70 38" aria-hidden="true" focusable="false")
+                  path(d="M7 20 C 5 7, 55 3, 62 16 C 67 29, 22 35, 10 27 C 3 22, 9 11, 22 8")
+              span= row.date
+            span.polaris-toc__title
+              a(href=url_for(row.path))= row.title
+              if row.sticky
+                span.polaris-toc__sticky 置顶
+            if row.category
+              a.polaris-toc__category(href=url_for(row.category.path))= row.category.name
+
+  include includes/pagination.pug
+
+  script(src=url_for('/js/polaris-quote-core.js') defer)
+  script(src=url_for('/js/polaris-home.js') defer)
