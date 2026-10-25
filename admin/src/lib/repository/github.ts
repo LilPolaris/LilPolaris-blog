@@ -97,6 +97,21 @@ class AsyncTtlLruCache<T> {
     this.entries.delete(key);
   }
 
+  has(key: string) {
+    const cached = this.entries.get(key);
+    return Boolean(cached && cached.expiresAt > Date.now());
+  }
+
+  /** Stores an already known value, e.g. from a batched read. */
+  prime(key: string, value: T) {
+    if (this.has(key)) return;
+    this.entries.set(key, {
+      expiresAt: Date.now() + this.ttlMs,
+      value: Promise.resolve(value),
+    });
+    this.trim();
+  }
+
   private trim() {
     while (this.entries.size > this.maxEntries) {
       const oldest = this.entries.keys().next().value;
@@ -151,6 +166,18 @@ class TtlLruMap<T> {
 const READ_TIMEOUT_MS = 10_000;
 const READ_RETRY_DELAYS_MS = [100, 200];
 const POST_BLOB_CONCURRENCY = 6;
+
+interface GraphqlTreeEntries {
+  entries?: Array<{
+    oid: string;
+    object?: { text?: string | null; isBinary?: boolean; isTruncated?: boolean } | null;
+  }> | null;
+}
+
+type GraphqlClient = (
+  query: string,
+  variables: Record<string, unknown>,
+) => Promise<{ repository?: Record<string, GraphqlTreeEntries | null> | null }>;
 
 const headCache = new AsyncTtlLruCache<RepositoryHead>(64, 5_000);
 const treeCache = new AsyncTtlLruCache<RepositoryTree>(64, 60_000);
@@ -476,6 +503,11 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
           entry.path?.startsWith(`${directory}/`),
         ),
     );
+    await this.prefetchPostTexts(
+      headSha,
+      directories,
+      new Set(files.map((entry) => entry.sha!)),
+    );
     const documents = await mapWithConcurrency(
       files,
       POST_BLOB_CONCURRENCY,
@@ -491,6 +523,63 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
     return documents
       .map(summaryFromDocument)
       .sort((a, b) => b.updated.localeCompare(a.updated));
+  }
+
+  /**
+   * A cold serverless instance would otherwise fetch every article with its
+   * own REST call. One GraphQL request returns the text of all top-level
+   * Markdown files per directory; anything it cannot provide (nested files,
+   * truncated or binary blobs, GraphQL errors) falls back to REST.
+   */
+  private async prefetchPostTexts(
+    headSha: string,
+    directories: string[],
+    wanted: Set<string>,
+  ) {
+    const graphql = (this.octokit as unknown as { graphql?: GraphqlClient })
+      .graphql;
+    if (typeof graphql !== "function") return;
+    const missing = [...wanted].filter(
+      (sha) => !blobTextCache.has(this.repositoryCacheKey(`blobs/${sha}`)),
+    );
+    if (missing.length < 2) return;
+    const variables: Record<string, unknown> = {
+      owner: this.config.owner,
+      repo: this.config.repo,
+    };
+    const fields = directories.map((directory, index) => {
+      variables[`expression${index}`] = `${headSha}:${normalizeRepoPath(directory)}`;
+      return `d${index}: object(expression: $expression${index}) {
+        ... on Tree { entries { oid object { ... on Blob { text isBinary isTruncated } } } }
+      }`;
+    });
+    const parameters = directories
+      .map((_, index) => `$expression${index}: String!`)
+      .join(", ");
+    const query = `query($owner: String!, $repo: String!, ${parameters}) {
+      repository(owner: $owner, name: $repo) { ${fields.join("\n")} }
+    }`;
+    try {
+      const result = await this.readRequest((signal) =>
+        graphql(query, { ...variables, request: { signal } }),
+      );
+      for (const tree of Object.values(result.repository || {})) {
+        for (const entry of tree?.entries || []) {
+          const text = entry.object?.text;
+          if (
+            !wanted.has(entry.oid) ||
+            typeof text !== "string" ||
+            entry.object?.isBinary ||
+            entry.object?.isTruncated
+          ) {
+            continue;
+          }
+          blobTextCache.prime(this.repositoryCacheKey(`blobs/${entry.oid}`), text);
+        }
+      }
+    } catch {
+      // REST reads below still load every file individually.
+    }
   }
 
   async getPost(path: string): Promise<PostDocument> {

@@ -1,13 +1,14 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { ImageIcon, RefreshCw, Search, X } from "lucide-react";
+import { RefreshCw, Search, X } from "lucide-react";
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 import {
   defaultMediaAlt,
   mediaMarkdown,
 } from "@/components/media/media-markdown";
+import { MediaThumb } from "@/components/media/media-thumb";
 import type { MediaAsset } from "@/lib/types";
 
 export interface MediaPickerSelection {
@@ -127,13 +128,7 @@ export function MediaPickerDialog({
                     type="button"
                   >
                     <span className="media-picker-preview">
-                      {item.downloadUrl ? (
-                        // Protected media URLs cannot be handled by next/image without exposing auth.
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img alt="" loading="lazy" src={item.downloadUrl} />
-                      ) : (
-                        <ImageIcon aria-hidden="true" size={24} />
-                      )}
+                      <MediaThumb alt="" retryable={false} src={item.downloadUrl} width={240} />
                     </span>
                     <span title={item.path}>{item.name}</span>
                   </button>

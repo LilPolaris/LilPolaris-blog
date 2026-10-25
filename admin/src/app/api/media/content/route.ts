@@ -1,6 +1,8 @@
+import sharp from "sharp";
 import { requireAdminApi } from "@/lib/auth-guard";
 import { AppError, errorResponse } from "@/lib/errors";
 import { beginApiRequest, logApiEvent } from "@/lib/observability";
+import { RESIZABLE_IMAGE_TYPES, thumbnailWidth } from "@/lib/media-thumbnail";
 import { getRepository } from "@/lib/repository";
 
 export async function GET(request: Request) {
@@ -10,16 +12,32 @@ export async function GET(request: Request) {
     const searchParams = new URL(request.url).searchParams;
     const path = searchParams.get("path");
     const sha = searchParams.get("sha") || undefined;
+    const width = thumbnailWidth(searchParams.get("w"));
     if (!path) throw new AppError("VALIDATION", "缺少媒体路径。", 400);
     const repository = await getRepository();
     const media = await repository.getMedia(path, sha);
+    let bytes: Uint8Array = media.bytes;
+    let contentType = media.contentType;
+    if (width && RESIZABLE_IMAGE_TYPES.has(contentType)) {
+      // Library grids only need small previews; shrinking them on the server
+      // keeps a page of thumbnails to a few hundred kilobytes.
+      bytes = new Uint8Array(
+        await sharp(media.bytes, { failOn: "none" })
+          .rotate()
+          .resize({ width, withoutEnlargement: true })
+          .webp({ quality: 72 })
+          .toBuffer(),
+      );
+      contentType = "image/webp";
+    }
     logApiEvent(context, "api.request.succeeded", {
-      size: media.bytes.byteLength,
+      size: bytes.byteLength,
+      thumbnail: Boolean(width),
     });
-    return new Response(media.bytes as BodyInit, {
+    return new Response(bytes as BodyInit, {
       headers: {
-        "content-type": media.contentType,
-        etag: media.etag,
+        "content-type": contentType,
+        etag: width ? `${media.etag}-w${width}` : media.etag,
         "cache-control": sha
           ? "private, max-age=31536000, immutable"
           : "private, max-age=3600",

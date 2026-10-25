@@ -1954,10 +1954,48 @@ html[data-editor-focus] .editor-shell {
   justify-content: center;
 }
 
-.media-preview img {
+.media-thumb {
+  align-items: center;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+}
+
+.media-thumb.loading::before {
+  animation: pulse 1.5s ease-in-out infinite;
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+  content: "";
+  inset: 10px;
+  position: absolute;
+}
+
+.media-thumb img {
   height: 100%;
   object-fit: contain;
+  opacity: 0;
+  position: relative;
+  transition: opacity 180ms ease;
   width: 100%;
+}
+
+.media-thumb.loaded img {
+  opacity: 1;
+}
+
+.media-thumb-retry {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  gap: 5px;
+  padding: 5px 9px;
 }
 
 .media-copy {

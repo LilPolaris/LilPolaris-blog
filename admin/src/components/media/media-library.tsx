@@ -3,7 +3,6 @@
 import {
   Check,
   Copy,
-  ImageIcon,
   RefreshCw,
   Search,
   Trash2,
@@ -22,6 +21,7 @@ import {
 import { formatBytes, formatDate } from "@/lib/format";
 import { MediaUploadError, uploadMediaRequest } from "@/lib/media-upload-request";
 import type { MediaAsset, PostKind } from "@/lib/types";
+import { MediaThumb } from "@/components/media/media-thumb";
 import { Toast } from "@/components/toast";
 
 type UploadStatus =
@@ -470,13 +470,7 @@ export function MediaLibrary({
             return (
               <article className="media-card" key={item.path}>
                 <div className="media-preview">
-                  {item.downloadUrl ? (
-                    // Authenticated media is served through the protected proxy.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img alt={item.name} loading="lazy" src={item.downloadUrl} />
-                  ) : (
-                    <ImageIcon size={28} />
-                  )}
+                  <MediaThumb alt={item.name} src={item.downloadUrl} />
                 </div>
                 <div className="media-copy">
                   <div className="media-name" title={item.path}>{item.name}</div>

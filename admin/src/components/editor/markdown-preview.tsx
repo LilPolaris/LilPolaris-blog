@@ -131,7 +131,8 @@ function transformAssetTags(
       if (!postPath) return `![${alt}](${file})`;
       const directory = postPath.replace(/\.md$/i, "");
       const path = `${directory}/${file}`;
-      return `![${alt}](/api/media/content?path=${encodeURIComponent(path)})`;
+      // The editor column is at most ~820px wide; 1200px stays sharp on HiDPI.
+      return `![${alt}](/api/media/content?path=${encodeURIComponent(path)}&w=1200)`;
     },
   );
 }

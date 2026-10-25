@@ -145,6 +145,50 @@ describe("GitHubRepositoryAdapter reads", () => {
     expect(secondFixture.rest.git.getBlob).not.toHaveBeenCalled();
   });
 
+  it("loads all article texts with one GraphQL request when available", async () => {
+    const entries = Array.from({ length: 5 }, (_, index) => ({
+      path: `source/_posts/batch-${index}.md`,
+      sha: `${"b".repeat(38)}${index.toString(16).padStart(2, "0")}`,
+    }));
+    const fixture = readFixture(entries);
+    const graphql = vi.fn(async () => ({
+      repository: {
+        d0: {
+          entries: entries.slice(0, 4).map((entry, index) => ({
+            oid: entry.sha,
+            object: { text: markdown(index), isBinary: false, isTruncated: false },
+          })),
+        },
+        d1: null,
+      },
+    }));
+    const adapter = new GitHubRepositoryAdapter(config("graphql-batch"), "token");
+    attachOctokit(adapter, { ...fixture, graphql });
+
+    const posts = await adapter.listPosts();
+
+    expect(posts).toHaveLength(5);
+    expect(graphql).toHaveBeenCalledTimes(1);
+    // The fifth file was not in the GraphQL answer and is read over REST.
+    expect(fixture.rest.git.getBlob).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to REST blob reads when GraphQL fails", async () => {
+    const entries = Array.from({ length: 3 }, (_, index) => ({
+      path: `source/_posts/fallback-${index}.md`,
+      sha: `${"c".repeat(38)}${index.toString(16).padStart(2, "0")}`,
+    }));
+    const fixture = readFixture(entries);
+    const graphql = vi.fn(async () => {
+      throw Object.assign(new Error("Resource not accessible"), { status: 403 });
+    });
+    const adapter = new GitHubRepositoryAdapter(config("graphql-fallback"), "token");
+    attachOctokit(adapter, { ...fixture, graphql });
+
+    expect(await adapter.listPosts()).toHaveLength(3);
+    expect(fixture.rest.git.getBlob).toHaveBeenCalledTimes(3);
+  });
+
   it("retries transient reads with backoff but never retries a write", async () => {
     const fixture = readFixture([]);
     fixture.rest.git.getRef
