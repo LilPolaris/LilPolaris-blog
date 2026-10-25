@@ -57,7 +57,7 @@ $lines = @(
   "",
   "AI_PROVIDER=deepseek",
   "AI_BASE_URL=https://api.deepseek.com",
-  "AI_MODEL=deepseek-v4-flash",
+  "AI_MODEL=deepseek-flash",
   "AI_API_KEY=",
   "AI_TIMEOUT_MS=45000"
 )

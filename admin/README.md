@@ -19,7 +19,7 @@ GitHub 写入统一经过 Repository Adapter 的中央保护。Vercel Preview �
 不需要生产解锁变量。Preview 在任何分支上都不能触发部署工作流。
 
 编辑器的“AI 智能生成”会根据中文标题、当前正文和历史已发布文章元数据回填英文文件名、
-标签和分类，默认连接 DeepSeek V4 Flash。API Key 可在“设置”页面粘贴，
+标签和分类，默认连接 DeepSeek V4.1 Flash（`deepseek-flash`）。API Key 可在“设置”页面粘贴，
 加密后保存在 HttpOnly Cookie 中；本地 Ollama 的切换示例见 `.env.example`。
 
 草稿首次发布时，服务端会按 `Asia/Shanghai` 写入秒级 `date` 和

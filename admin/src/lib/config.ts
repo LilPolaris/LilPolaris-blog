@@ -114,7 +114,7 @@ export function getAiMetadataConfig(): AiMetadataConfig {
   const defaults = {
     deepseek: {
       baseUrl: "https://api.deepseek.com",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
     },
     ollama: {
       baseUrl: "http://127.0.0.1:11434/v1",

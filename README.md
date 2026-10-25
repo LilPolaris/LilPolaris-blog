@@ -83,13 +83,13 @@ Windows 本机可运行 `admin/scripts/configure-local.ps1`，从已登录的 Gi
 - 非 Vercel 的本机 `AUTH_MODE=local-cli` 可写 `main`，无需生产解锁变量；
   Mock Adapter 不应用此保护。
 
-后台默认使用 DeepSeek V4 Flash。API Key 可直接在后台“设置”页面粘贴，
+后台默认使用 DeepSeek V4.1 Flash（`deepseek-flash`）。API Key 可直接在后台“设置”页面粘贴，
 经 `AUTH_SECRET` 加密后保存在当前浏览器的 HttpOnly Cookie 中：
 
 ```dotenv
 AI_PROVIDER=deepseek
 AI_BASE_URL=https://api.deepseek.com
-AI_MODEL=deepseek-v4-flash
+AI_MODEL=deepseek-flash
 AI_API_KEY=
 AI_TIMEOUT_MS=45000
 ```
