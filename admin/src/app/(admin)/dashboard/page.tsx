@@ -1,215 +1,198 @@
-import {
-  ArrowRight,
-  CheckCircle2,
-  CircleAlert,
-  Clock3,
-  FileClock,
-  FileText,
-  GitBranch,
-  Plus,
-  Rocket,
-} from "lucide-react";
+import { ArrowRight, CircleAlert, ExternalLink, FileClock, PenLine, Plus } from "lucide-react";
 import Link from "next/link";
+import { DeploymentCard } from "@/components/dashboard/deployment-card";
+import { LocalRecoveryList } from "@/components/dashboard/local-recovery-list";
+import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { PageHeader } from "@/components/page-header";
-import { formatDate, workflowLabel } from "@/lib/format";
+import { blogTimestampToEpoch, formatDate, formatRelative } from "@/lib/format";
 import { getRepository } from "@/lib/repository";
 import { getDashboardData } from "@/lib/repository/repository";
+import { getEffectiveRepositoryConfig } from "@/lib/settings";
+import type { PostSummary } from "@/lib/types";
 
 export const metadata = { title: "概览" };
 
+function editHref(post: PostSummary) {
+  return `/posts/${post.id}/edit`;
+}
+
 export default async function DashboardPage() {
-  const repository = await getRepository();
-  const data = await getDashboardData(repository);
-  const run = data.latestRun;
+  const [repository, config] = await Promise.all([
+    getRepository(),
+    getEffectiveRepositoryConfig(),
+  ]);
+  const data = await getDashboardData(repository, {
+    timezone: config.timezone,
+  });
   const postsUnavailable = data.sourceStatus?.posts === "error";
   const workflowUnavailable = data.sourceStatus?.workflow === "error";
   const connectionUnavailable = data.sourceStatus?.connection === "error";
+  const now = Date.parse(data.lastSyncAt);
+  const toEpoch = (value: string) => blogTimestampToEpoch(value, config.timezone);
+  const continueDraft = data.recentDrafts[0];
+  const shown = (value: number) => (postsUnavailable ? "—" : value);
 
   return (
     <>
       <PageHeader
         actions={
-          <Link className="button primary" href="/posts/new">
-            <Plus size={16} />
-            新建文章
-          </Link>
+          <>
+            <RefreshButton />
+            <Link className="button primary" href="/posts/new">
+              <Plus size={16} />
+              新建文章
+            </Link>
+          </>
         }
-        description="关注内容、同步与部署状态。"
+        description={
+          postsUnavailable
+            ? "文章数据暂时读取失败。"
+            : data.latestPublishedAt
+              ? `上次发布于 ${formatRelative(toEpoch(data.latestPublishedAt), now)}。`
+              : "还没有已发布的文章。"
+        }
         title="概览"
       />
 
-      <section className="stats" aria-label="内容统计">
-        <div className="stat">
+      {postsUnavailable || connectionUnavailable ? (
+        <div className="alert danger dashboard-alert" role="status">
+          <CircleAlert aria-hidden="true" size={18} />
+          <span>
+            {postsUnavailable
+              ? "文章列表读取失败，下面的数字不代表真实数量。"
+              : "GitHub 仓库连接检查失败，保存和发布可能无法完成。"}
+            请检查网络或 GitHub 状态后点击“刷新”。
+          </span>
+        </div>
+      ) : null}
+
+      <section className="stats stats-4" aria-label="内容统计">
+        <Link className="stat" href="/posts?status=post">
           <div className="stat-label">已发布文章</div>
-          <div className="stat-value">
-            {postsUnavailable ? "—" : data.totalPosts}
-          </div>
-        </div>
-        <div className="stat">
+          <div className="stat-value">{shown(data.totalPosts)}</div>
+        </Link>
+        <Link className="stat" href="/drafts">
           <div className="stat-label">草稿</div>
+          <div className="stat-value">{shown(data.totalDrafts)}</div>
+        </Link>
+        <div className="stat">
+          <div className="stat-label">近 30 天有修改</div>
           <div className="stat-value">
-            {postsUnavailable ? "—" : data.totalDrafts}
+            {shown(data.updatedLast30Days)}
+            <span className="stat-unit">篇</span>
           </div>
         </div>
         <div className="stat">
-          <div className="stat-label">仓库连接</div>
-          <div
-            style={{
-              alignItems: "center",
-              color: data.repositoryConnected
-                ? "var(--success)"
-                : "var(--destructive)",
-              display: "flex",
-              fontSize: 16,
-              fontWeight: 650,
-              gap: 8,
-              marginTop: 10,
-            }}
-          >
-            {data.repositoryConnected ? (
-              <CheckCircle2 size={18} />
-            ) : (
-              <CircleAlert size={18} />
-            )}
-              {data.repositoryConnected ? "已连接" : "连接失败"}
+          <div className="stat-label">上次发布</div>
+          <div className="stat-value stat-value-text">
+            {data.latestPublishedAt
+              ? formatRelative(toEpoch(data.latestPublishedAt), now)
+              : "—"}
           </div>
         </div>
       </section>
 
       <div className="dashboard-grid">
-        <section className="panel">
-          <div className="panel-header">
-            <h2 className="panel-title">最近修改</h2>
-            <Link className="button ghost" href="/posts">
-              查看全部 <ArrowRight size={14} />
-            </Link>
-          </div>
-          {postsUnavailable ? (
-            <div className="panel-body">
-              <div className="alert danger" role="status">
-                <CircleAlert aria-hidden="true" size={18} />
-                文章数据暂时读取失败，请稍后重新加载。
-              </div>
-            </div>
-          ) : data.recentUpdated.length ? (
-            <ul className="list">
-              {data.recentUpdated.map((post) => (
-                <li className="list-item" key={post.path}>
-                  <div style={{ minWidth: 0 }}>
-                    <Link
-                      className="list-primary"
-                      href={`/posts/${post.id}/edit`}
-                    >
-                      {post.title}
-                    </Link>
-                    <div className="list-secondary">
-                      {post.slug} · {formatDate(post.updated)}
-                    </div>
-                  </div>
-                  <span
-                    className={`badge${post.draft ? " warning" : " success"}`}
-                  >
-                    {post.draft ? (
-                      <FileClock size={12} />
-                    ) : (
-                      <FileText size={12} />
-                    )}
-                    {post.draft ? "草稿" : "已发布"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="panel-body">
-              <p className="muted" style={{ margin: 0 }}>
-                暂无文章，先创建第一篇内容吧。
-              </p>
-            </div>
-          )}
-        </section>
+        <div className="dashboard-column">
+          <LocalRecoveryList />
 
-        <div style={{ display: "grid", gap: 20 }}>
+          {continueDraft ? (
+            <Link className="continue-card" href={editHref(continueDraft)}>
+              <span className="continue-icon">
+                <PenLine aria-hidden="true" size={18} />
+              </span>
+              <span className="continue-copy">
+                <span className="continue-label">继续写草稿</span>
+                <strong>{continueDraft.title}</strong>
+                <span className="list-secondary">
+                  {continueDraft.slug} · 最后修改 {formatRelative(toEpoch(continueDraft.updated), now)}
+                </span>
+              </span>
+              <ArrowRight aria-hidden="true" size={16} />
+            </Link>
+          ) : null}
+
           <section className="panel">
             <div className="panel-header">
-              <h2 className="panel-title">最近部署</h2>
-              <Link className="button ghost" href="/deployments">
-                记录 <ArrowRight size={14} />
+              <h2 className="panel-title">最近修改</h2>
+              <Link className="button ghost" href="/posts">
+                全部文章 <ArrowRight size={14} />
               </Link>
             </div>
-            <div className="panel-body">
-              {workflowUnavailable ? (
-                <div className="alert danger" role="status">
-                  <CircleAlert aria-hidden="true" size={18} />
-                  部署状态暂时读取失败，不代表尚未部署。
-                </div>
-              ) : run ? (
-                <>
-                  <div
-                    style={{
-                      alignItems: "center",
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span className="list-primary">{run.name}</span>
-                    <span
-                      className={`badge ${
-                        run.conclusion === "success"
-                          ? "success"
-                          : run.status !== "completed"
-                            ? "warning"
-                            : "danger"
-                      }`}
-                    >
-                      <Rocket size={12} />
-                      {workflowLabel(run.status, run.conclusion)}
-                    </span>
-                  </div>
-                  <div className="list-secondary" style={{ marginTop: 12 }}>
-                    <GitBranch size={12} style={{ verticalAlign: -2 }} />{" "}
-                    {run.branch} · {run.title}
-                  </div>
-                  <div className="list-secondary" style={{ marginTop: 5 }}>
-                    <Clock3 size={12} style={{ verticalAlign: -2 }} />{" "}
-                    {formatDate(run.startedAt)}
-                  </div>
-                </>
-              ) : (
+            {postsUnavailable ? (
+              <div className="panel-body">
                 <p className="muted" style={{ margin: 0 }}>
-                  尚未找到部署记录。
+                  文章数据暂时读取失败，请稍后刷新。
                 </p>
-              )}
-            </div>
+              </div>
+            ) : data.recentUpdated.length ? (
+              <ul className="list">
+                {data.recentUpdated.map((post) => (
+                  <li className="list-item" key={post.path}>
+                    <div style={{ minWidth: 0 }}>
+                      <Link className="list-primary" href={editHref(post)}>
+                        {post.title}
+                      </Link>
+                      <div className="list-secondary">
+                        {post.slug} · {formatDate(post.updated)}
+                      </div>
+                    </div>
+                    {post.draft ? (
+                      <span className="badge warning">
+                        <FileClock size={12} />
+                        草稿
+                      </span>
+                    ) : (
+                      <span className="badge success">已发布</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="panel-body">
+                <p className="muted" style={{ margin: 0 }}>
+                  暂无文章，先创建第一篇内容吧。
+                </p>
+              </div>
+            )}
           </section>
+        </div>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2 className="panel-title">同步状态</h2>
-            </div>
-            <div className="panel-body">
-              <div className="repo-line" style={{ marginBottom: 6 }}>
-                <span
-                  className="status-dot"
-                  style={
-                    postsUnavailable || connectionUnavailable
-                      ? { background: "var(--warning)" }
-                      : undefined
-                  }
-                />
-                {postsUnavailable || connectionUnavailable
-                  ? "部分 GitHub 数据读取失败"
-                  : "GitHub 数据已读取"}
+        <div className="dashboard-column">
+          <DeploymentCard
+            initialRun={data.latestRun}
+            publicBlogUrl={config.publicBlogUrl}
+            unavailable={workflowUnavailable}
+          />
+
+          {data.recentPublished.length ? (
+            <section className="panel">
+              <div className="panel-header">
+                <h2 className="panel-title">最近发布</h2>
               </div>
-              <div className="list-secondary">
-                本次读取：{formatDate(data.lastSyncAt)}
-              </div>
-              {postsUnavailable || connectionUnavailable ? (
-                <div className="list-secondary" style={{ marginTop: 5 }}>
-                  请检查网络或 GitHub 状态后重新加载；页面不会把失败显示成空数据。
-                </div>
-              ) : null}
-            </div>
-          </section>
+              <ul className="list">
+                {data.recentPublished.map((post) => (
+                  <li className="list-item compact" key={post.path}>
+                    <div style={{ minWidth: 0 }}>
+                      <Link className="list-primary" href={editHref(post)}>
+                        {post.title}
+                      </Link>
+                      <div className="list-secondary">{formatDate(post.date, false)}</div>
+                    </div>
+                    <a
+                      aria-label={`打开公开页面：${post.title}`}
+                      className="icon-button ghost"
+                      href={`${config.publicBlogUrl}/posts/${post.slug}/`}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <ExternalLink size={14} />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       </div>
     </>

@@ -81,3 +81,23 @@ export function replaceUploadedMediaNames(
     },
   );
 }
+
+/** URL-safe base64 of a repository path, matching the server's post IDs. */
+export function encodePostPathId(path: string) {
+  const bytes = new TextEncoder().encode(path);
+  let binary = "";
+  bytes.forEach((value) => {
+    binary += String.fromCharCode(value);
+  });
+  return btoa(binary)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+}
+
+export const RECOVERY_KEY_PREFIX = "lilpolaris-recovery:";
+export const NEW_ARTICLE_RECOVERY_PATH = "new-article";
+
+export function recoveryKeyForPath(path?: string) {
+  return `${RECOVERY_KEY_PREFIX}${path || NEW_ARTICLE_RECOVERY_PATH}`;
+}

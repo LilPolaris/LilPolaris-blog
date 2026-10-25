@@ -5,6 +5,7 @@ import { AlertTriangle, Merge, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
+import { Toast } from "@/components/toast";
 
 export interface TaxonomyAffectedPost {
   kind: "post" | "draft";
@@ -270,11 +271,7 @@ export function TaxonomyManager({
         </Dialog.Portal>
       </Dialog.Root>
 
-      {message ? (
-        <div aria-live="polite" className="toast">
-          {message}
-        </div>
-      ) : null}
+      <Toast message={message} onDismiss={() => setMessage("")} />
     </>
   );
 }

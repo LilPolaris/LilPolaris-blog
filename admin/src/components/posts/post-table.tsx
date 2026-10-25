@@ -24,6 +24,7 @@ import {
   type PostListState,
 } from "@/lib/post-list-state";
 import type { PostDocument, PostSummary } from "@/lib/types";
+import { Toast } from "@/components/toast";
 
 const PAGE_SIZE = 10;
 
@@ -528,11 +529,7 @@ export function PostTable({
           title={posts.length ? "没有匹配结果" : "还没有文章"}
         />
       )}
-      {message ? (
-        <div aria-live="polite" className="toast">
-          {message}
-        </div>
-      ) : null}
+      <Toast message={message} onDismiss={() => setMessage("")} />
     </section>
   );
 }

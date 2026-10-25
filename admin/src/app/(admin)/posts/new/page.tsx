@@ -38,7 +38,7 @@ export default async function NewPostPage({
     permalink: "",
   };
   return (
-    <div style={{ margin: "-18px -8px -30px" }}>
+    <div className="editor-page">
       <ArticleEditor
         blogTimezone={config.timezone}
         defaults={defaults}

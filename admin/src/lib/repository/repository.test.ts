@@ -77,4 +77,18 @@ describe("getDashboardData", () => {
     });
     expect(data.sourceErrors).toEqual({ posts: "post read unavailable" });
   });
+
+  it("reports the latest real deployment instead of a skipped comment run", async () => {
+    const repository = new MockRepositoryAdapter(config);
+    const runs = await repository.listWorkflowRuns();
+    vi.spyOn(repository, "listWorkflowRuns").mockResolvedValue([
+      { ...runs[0], id: 9, event: "issue_comment", conclusion: "skipped" },
+      { ...runs[0], id: 8, event: "push", conclusion: "failure" },
+    ]);
+
+    const data = await getDashboardData(repository);
+
+    expect(data.latestRun?.id).toBe(8);
+    expect(data.recentDrafts.every((post) => post.kind === "draft")).toBe(true);
+  });
 });

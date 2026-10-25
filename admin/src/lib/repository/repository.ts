@@ -1,3 +1,5 @@
+import { formatBlogTimestamp } from "@/lib/blog-time";
+import { isDeploymentAttempt } from "@/lib/format";
 import type {
   DashboardData,
   MediaAsset,
@@ -56,6 +58,7 @@ export interface RepositoryAdapter {
 
 export async function getDashboardData(
   repository: RepositoryAdapter,
+  { timezone = "Asia/Shanghai", now = new Date() } = {},
 ): Promise<DashboardData> {
   const [postResult, connectionResult, workflowResult] =
     await Promise.allSettled([
@@ -74,6 +77,9 @@ export async function getDashboardData(
     b.updated.localeCompare(a.updated),
   );
   const published = [...posts].sort((a, b) => b.date.localeCompare(a.date));
+  const recentDrafts = [...drafts]
+    .sort((a, b) => b.updated.localeCompare(a.updated))
+    .slice(0, 3);
   const errorMessage = (
     result: PromiseSettledResult<unknown>,
     fallback: string,
@@ -86,9 +92,22 @@ export async function getDashboardData(
     totalDrafts: drafts.length,
     recentUpdated: updated.slice(0, 5),
     recentPublished: published.slice(0, 5),
+    recentDrafts,
+    // Hexo timestamps share one fixed-width format, so a string comparison
+    // against the cutoff in the blog timezone is an exact date comparison.
+    updatedLast30Days: (() => {
+      const cutoff = formatBlogTimestamp(
+        new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+        timezone,
+      );
+      return allPosts.filter((post) => post.updated >= cutoff).length;
+    })(),
+    latestPublishedAt: published[0]?.date || null,
     repositoryConnected: connected,
     lastSyncAt: new Date().toISOString(),
-    latestRun: runs[0] || null,
+    // Skipped runs (guestbook comments) never deployed anything; showing one
+    // would hide the state of the last real deployment.
+    latestRun: runs.find(isDeploymentAttempt) || null,
     sourceStatus: {
       posts: postResult.status === "fulfilled" ? "ok" : "error",
       connection: connected ? "ok" : "error",

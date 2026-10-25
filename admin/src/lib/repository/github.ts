@@ -1141,7 +1141,7 @@ export class GitHubRepositoryAdapter implements RepositoryAdapter {
         ...this.args(),
         workflow_id: this.config.workflowId,
         branch: this.config.branch,
-        per_page: 20,
+        per_page: 40,
         request: { signal },
       }),
     );

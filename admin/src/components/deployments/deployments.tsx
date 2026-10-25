@@ -7,22 +7,23 @@ import {
   RefreshCw,
   RotateCw,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
-import { formatDate, workflowLabel } from "@/lib/format";
+import {
+  formatDate,
+  formatDuration,
+  isDeploymentAttempt,
+  workflowEventLabel,
+  workflowLabel,
+  workflowTone,
+} from "@/lib/format";
 import type { WorkflowRun } from "@/lib/types";
 
 const POLL_INTERVAL_MS = 2500;
 const POLL_TIMEOUT_MS = 2 * 60 * 1000;
+const WATCH_INTERVAL_MS = 5_000;
+const WATCH_TIMEOUT_MS = 15 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10_000;
-
-function duration(start: string, end: string) {
-  const milliseconds = new Date(end).getTime() - new Date(start).getTime();
-  if (!Number.isFinite(milliseconds) || milliseconds < 0) return "—";
-  const seconds = Math.round(milliseconds / 1000);
-  if (seconds < 60) return `${seconds} 秒`;
-  return `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
-}
 
 function canRetry(run: WorkflowRun) {
   return (
@@ -30,6 +31,10 @@ function canRetry(run: WorkflowRun) {
     run.conclusion !== "success" &&
     run.conclusion !== "skipped"
   );
+}
+
+function hasActiveRun(runs: WorkflowRun[]) {
+  return runs.some((run) => run.status !== "completed");
 }
 
 async function readRuns(signal?: AbortSignal) {
@@ -59,34 +64,93 @@ export function Deployments({
   const [currentRuns, setCurrentRuns] = useState(runs);
   const [busy, setBusy] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [watching, setWatching] = useState(false);
+  const [showSkipped, setShowSkipped] = useState(false);
   const [message, setMessage] = useState("");
   const [trackedRunId, setTrackedRunId] = useState<number>();
   const pollAbortRef = useRef<AbortController | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const watchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollingRef = useRef(false);
 
-  useEffect(
-    () => () => {
+  const stopWatching = useCallback(() => {
+    if (watchTimerRef.current) clearTimeout(watchTimerRef.current);
+    watchTimerRef.current = null;
+    setWatching(false);
+  }, []);
+
+  // Runs started elsewhere (a push from the editor, a merge) are followed
+  // automatically while this page is open, so it never shows a stale
+  // "running" badge that only a manual refresh would clear.
+  const startWatching = useCallback(() => {
+    if (watchTimerRef.current || pollingRef.current) return;
+    const deadline = Date.now() + WATCH_TIMEOUT_MS;
+    setWatching(true);
+    const tick = async () => {
+      if (pollingRef.current) {
+        watchTimerRef.current = null;
+        setWatching(false);
+        return;
+      }
+      try {
+        const nextRuns = await readRuns();
+        setCurrentRuns(nextRuns);
+        if (!hasActiveRun(nextRuns) || Date.now() >= deadline) {
+          watchTimerRef.current = null;
+          setWatching(false);
+          return;
+        }
+      } catch {
+        if (Date.now() >= deadline) {
+          watchTimerRef.current = null;
+          setWatching(false);
+          return;
+        }
+      }
+      watchTimerRef.current = setTimeout(tick, WATCH_INTERVAL_MS);
+    };
+    watchTimerRef.current = setTimeout(tick, WATCH_INTERVAL_MS);
+  }, []);
+
+  useEffect(() => {
+    if (hasActiveRun(runs)) startWatching();
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || pollingRef.current) return;
+      void readRuns()
+        .then((nextRuns) => {
+          setCurrentRuns(nextRuns);
+          if (hasActiveRun(nextRuns)) startWatching();
+        })
+        .catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
       pollAbortRef.current?.abort();
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-    },
-    [],
-  );
+      if (watchTimerRef.current) clearTimeout(watchTimerRef.current);
+      watchTimerRef.current = null;
+    };
+  }, [runs, startWatching]);
 
   function stopPolling() {
     pollAbortRef.current?.abort();
     pollAbortRef.current = null;
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     pollTimerRef.current = null;
+    pollingRef.current = false;
     setPolling(false);
   }
 
   function beginPolling(baselineId: number) {
     stopPolling();
+    stopWatching();
     const controller = new AbortController();
     const deadline = Date.now() + POLL_TIMEOUT_MS;
     let observedRunId: number | undefined;
     let transientFailures = 0;
     pollAbortRef.current = controller;
+    pollingRef.current = true;
     setPolling(true);
 
     const poll = async () => {
@@ -120,7 +184,7 @@ export function Deployments({
         }
         if (Date.now() >= deadline) {
           stopPolling();
-          setMessage("等待部署状态超时；工作流可能仍在 GitHub 中运行，请手动刷新。 ");
+          setMessage("等待部署状态超时；工作流可能仍在 GitHub 中运行，请手动刷新。");
           return;
         }
         pollTimerRef.current = setTimeout(poll, POLL_INTERVAL_MS);
@@ -149,7 +213,9 @@ export function Deployments({
     setBusy(true);
     setMessage("");
     try {
-      setCurrentRuns(await readRuns());
+      const nextRuns = await readRuns();
+      setCurrentRuns(nextRuns);
+      if (hasActiveRun(nextRuns)) startWatching();
       setMessage("部署状态已刷新。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "部署状态读取失败。");
@@ -201,6 +267,15 @@ export function Deployments({
   }
 
   const trackedRun = currentRuns.find((run) => run.id === trackedRunId);
+  const skippedCount = currentRuns.filter(
+    (run) => !isDeploymentAttempt(run),
+  ).length;
+  const visibleRuns = showSkipped
+    ? currentRuns
+    : currentRuns.filter(
+        (run) => isDeploymentAttempt(run) || run.id === trackedRunId,
+      );
+  const autoRefreshing = polling || watching;
 
   return (
     <section className="panel">
@@ -211,9 +286,21 @@ export function Deployments({
             <div className="list-secondary">
               本次运行 #{trackedRun.id} · {trackedRun.commitSha.slice(0, 7)}
             </div>
+          ) : watching ? (
+            <div className="list-secondary">有部署正在进行，页面会自动更新</div>
           ) : null}
         </div>
         <div className="button-group">
+          {skippedCount ? (
+            <label className="inline-toggle">
+              <input
+                checked={showSkipped}
+                onChange={(event) => setShowSkipped(event.target.checked)}
+                type="checkbox"
+              />
+              显示已跳过（{skippedCount}）
+            </label>
+          ) : null}
           {publicBlogUrl ? (
             <a
               className="button"
@@ -226,8 +313,8 @@ export function Deployments({
             </a>
           ) : null}
           <button className="button" disabled={busy} onClick={refresh} type="button">
-            <RefreshCw className={polling ? "spin" : ""} size={15} />
-            {polling ? "自动刷新中" : "刷新"}
+            <RefreshCw className={autoRefreshing ? "spin" : ""} size={15} />
+            {autoRefreshing ? "自动刷新中" : "刷新"}
           </button>
           <button
             className="button primary"
@@ -240,52 +327,58 @@ export function Deployments({
           </button>
         </div>
       </div>
-      {currentRuns.length ? (
+      {visibleRuns.length ? (
         <div className="table-wrap">
-          <table className="table">
+          <table className="table deployments-table">
             <thead>
               <tr>
                 <th>工作流 / Commit</th>
-                <th>分支</th>
-                <th>触发方式</th>
+                <th>触发</th>
                 <th>状态</th>
                 <th>开始时间</th>
-                <th>运行时长</th>
-                <th>详情</th>
+                <th>耗时</th>
+                <th>
+                  <span className="sr-only">详情</span>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {currentRuns.map((run) => (
-                <tr className={run.id === trackedRunId ? "tracked-run" : undefined} key={run.id}>
+              {visibleRuns.map((run) => (
+                <tr
+                  className={[
+                    run.id === trackedRunId ? "tracked-run" : "",
+                    isDeploymentAttempt(run) ? "" : "skipped-run",
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || undefined}
+                  key={run.id}
+                >
                   <td className="post-title-cell">
-                    <div className="list-primary">
-                      {run.name} {run.id === trackedRunId ? <span className="badge warning">本次</span> : null}
-                    </div>
-                    <div className="list-secondary" title={run.title}>
+                    <div className="list-secondary run-title" title={run.title}>
                       {run.title || "无 Commit 信息"}
                     </div>
                     <div className="commit-sha">
                       <GitCommitHorizontal aria-hidden="true" size={13} />
-                      {run.commitSha.slice(0, 7)}
+                      {run.commitSha.slice(0, 7)} · {run.branch}
+                      {run.id === trackedRunId ? (
+                        <span className="badge warning">本次</span>
+                      ) : null}
                     </div>
                   </td>
-                  <td><span className="badge">{run.branch}</span></td>
-                  <td>{run.event === "workflow_dispatch" ? "手动触发" : run.event}</td>
+                  <td className="nowrap">{workflowEventLabel(run.event)}</td>
                   <td>
                     <span
-                      className={`badge ${
-                        run.conclusion === "success"
-                          ? "success"
-                          : run.status !== "completed"
-                            ? "warning"
-                            : "danger"
-                      }`}
+                      className={`badge ${workflowTone(run.status, run.conclusion)}`}
                     >
                       {workflowLabel(run.status, run.conclusion)}
                     </span>
                   </td>
-                  <td className="muted">{formatDate(run.startedAt)}</td>
-                  <td className="muted">{duration(run.startedAt, run.updatedAt)}</td>
+                  <td className="muted nowrap">{formatDate(run.startedAt)}</td>
+                  <td className="muted nowrap">
+                    {run.status === "completed"
+                      ? formatDuration(run.startedAt, run.updatedAt)
+                      : "—"}
+                  </td>
                   <td>
                     <div className="row-actions">
                       <a
@@ -325,7 +418,9 @@ export function Deployments({
           description={
             polling
               ? "已触发工作流，正在等待 GitHub 创建运行记录。"
-              : "GitHub 尚未返回该工作流的运行记录。"
+              : currentRuns.length
+                ? "最近的运行都被 GitHub 跳过，没有实际部署。"
+                : "GitHub 尚未返回该工作流的运行记录。"
           }
           title={polling ? "等待部署进入队列" : "暂无部署记录"}
         />

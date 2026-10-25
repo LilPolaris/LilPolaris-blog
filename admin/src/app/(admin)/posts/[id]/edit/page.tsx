@@ -22,21 +22,26 @@ export default async function EditPostPage({
     getRepository(),
     getEffectiveRepositoryConfig(),
   ]);
-  let post;
-  try {
-    post = await repository.getPost(decodePostId(id));
-  } catch (error) {
+  // Both reads share the cached repository tree, so running them together
+  // saves a full round of GitHub requests on every editor open.
+  const [postResult, posts] = await Promise.all([
+    repository.getPost(decodePostId(id)).then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    ),
+    repository.listPosts(),
+  ]);
+  if (!postResult.ok) {
+    const error = postResult.error;
     if (error instanceof AppError && error.code === "NOT_FOUND") {
       notFound();
     }
     throw error;
   }
-  const editorContext = buildEditorContext(
-    await repository.listPosts(),
-    config,
-  );
+  const post = postResult.value;
+  const editorContext = buildEditorContext(posts, config);
   return (
-    <div style={{ margin: "-18px -8px -30px" }}>
+    <div className="editor-page">
       <ArticleEditor
         blogTimezone={config.timezone}
         defaults={post.frontMatter}

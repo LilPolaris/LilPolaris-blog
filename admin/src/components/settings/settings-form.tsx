@@ -18,6 +18,7 @@ import {
   settingsOverridesSchema,
 } from "@/lib/settings-validation";
 import type { PostPreset, RepositoryConfig } from "@/lib/types";
+import { Toast } from "@/components/toast";
 
 interface StorageStatus {
   bytes: number;
@@ -459,7 +460,7 @@ export function SettingsForm({
           </button>
         </div>
       </div>
-      {message ? <div aria-live="polite" className="toast">{message}</div> : null}
+      <Toast message={message} onDismiss={() => setMessage("")} />
     </div>
   );
 }

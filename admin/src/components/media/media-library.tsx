@@ -22,6 +22,7 @@ import {
 import { formatBytes, formatDate } from "@/lib/format";
 import { MediaUploadError, uploadMediaRequest } from "@/lib/media-upload-request";
 import type { MediaAsset, PostKind } from "@/lib/types";
+import { Toast } from "@/components/toast";
 
 type UploadStatus =
   | "queued"
@@ -539,7 +540,7 @@ export function MediaLibrary({
           title={usage === "unused" ? "没有疑似未使用资源" : media.length ? "没有匹配结果" : "媒体库为空"}
         />
       )}
-      {message ? <div aria-live="polite" className="toast">{message}</div> : null}
+      <Toast message={message} onDismiss={() => setMessage("")} />
     </section>
   );
 }

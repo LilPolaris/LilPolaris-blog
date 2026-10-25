@@ -1,4 +1,4 @@
-import { ExternalLink, LogOut } from "lucide-react";
+import { ExternalLink, GitBranch, LogOut } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "@/auth";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -28,12 +28,18 @@ export default async function AdminLayout({
         </Link>
         <NavLinks />
         <div className="sidebar-footer">
-          <div className="repo-line" title={`${config.owner}/${config.repo}`}>
-            <span className="status-dot" />
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+          <a
+            className="repo-link"
+            href={`https://github.com/${config.owner}/${config.repo}`}
+            rel="noreferrer"
+            target="_blank"
+            title={`在 GitHub 打开 ${config.owner}/${config.repo}（${config.branch}）`}
+          >
+            <GitBranch aria-hidden="true" size={13} />
+            <span>
               {config.owner}/{config.repo}
             </span>
-          </div>
+          </a>
           <div className="user-line">
             <span
               className="avatar"

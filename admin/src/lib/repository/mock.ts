@@ -618,7 +618,16 @@ categories:
         updatedAt: new Date(Date.now() - 30_000).toISOString(),
         htmlUrl: `https://github.com/${this.config.owner}/${this.config.repo}/actions`,
       };
-    if (!this.dispatchedWorkflow) return [baseline];
+    const skippedComment: WorkflowRun = {
+      ...baseline,
+      id: 1000,
+      event: "issue_comment",
+      conclusion: "skipped",
+      title: "guestbook comment",
+      startedAt: new Date(Date.now() - 20_000).toISOString(),
+      updatedAt: new Date(Date.now() - 18_000).toISOString(),
+    };
+    if (!this.dispatchedWorkflow) return [skippedComment, baseline];
     const elapsed = Date.now() - this.dispatchedWorkflow.startedAt;
     const completed = elapsed >= 4_000;
     const queued = elapsed < 1_000;
@@ -638,6 +647,7 @@ categories:
         ).toISOString(),
         htmlUrl: `https://github.com/${this.config.owner}/${this.config.repo}/actions`,
       },
+      skippedComment,
       baseline,
     ];
   }

@@ -202,6 +202,9 @@ export interface DashboardData {
   totalDrafts: number;
   recentUpdated: PostSummary[];
   recentPublished: PostSummary[];
+  recentDrafts: PostSummary[];
+  updatedLast30Days: number;
+  latestPublishedAt: string | null;
   repositoryConnected: boolean;
   lastSyncAt: string;
   latestRun: WorkflowRun | null;

@@ -2,8 +2,10 @@
 
 import { redo, undo } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
+import type { EditorState, TransactionSpec } from "@codemirror/state";
 import {
   EditorView as CodeMirrorView,
+  keymap,
   type EditorView,
 } from "@codemirror/view";
 import { del, get, set } from "idb-keyval";
@@ -15,16 +17,22 @@ import {
   Eye,
   FileClock,
   Heading2,
+  Heading3,
   ImagePlus,
   Images,
   Italic,
   Link as LinkIcon,
   List,
+  ListChecks,
   ListOrdered,
+  Maximize2,
+  Minimize2,
+  Minus,
   PanelRightClose,
   PanelRightOpen,
   Quote,
   Redo2,
+  Strikethrough,
   Table2,
   Trash2,
   Undo2,
@@ -40,9 +48,27 @@ import {
   useRef,
   useState,
 } from "react";
+import { ChipInput, type ChipSuggestion } from "@/components/editor/chip-input";
+import {
+  applySlashCommand,
+  selectSlashIndex,
+  SLASH_ACTION_EVENT,
+  slashCommandExtension,
+  slashMenuState,
+  type SlashCommand,
+} from "@/components/editor/slash-commands";
 import { livePreviewExtension } from "@/components/editor/live-preview-extension";
 import { MediaPickerDialog } from "@/components/media/media-picker";
+import { Toast } from "@/components/toast";
 import { formatBlogTimestamp } from "@/lib/blog-time";
+import { formatRelative } from "@/lib/format";
+import {
+  insertBlock,
+  insertLink,
+  toggleInlineMarker,
+  toggleLinePrefix,
+} from "@/lib/markdown-commands";
+import { pastedHtmlToMarkdown, shouldConvertPastedHtml } from "@/lib/paste-html";
 import { markdownOutline } from "@/lib/markdown-outline";
 import { readBrowserValue, writeBrowserValue } from "@/lib/browser-storage";
 import {
@@ -52,8 +78,10 @@ import {
 } from "@/lib/client-image";
 import {
   articleContentForAi,
+  encodePostPathId,
   kindForRegularSave,
   migrateRecoveredFrontMatter,
+  recoveryKeyForPath,
   replaceUploadedMediaNames,
   slugFromTitle,
   type RecoverableFrontMatter,
@@ -67,6 +95,7 @@ import {
 } from "@/lib/pending-media";
 import type {
   AiMetadataSuggestion,
+  CategoryPath,
   EditableFrontMatter,
   EditorContext,
   EditorMode,
@@ -79,8 +108,18 @@ import type {
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), {
   ssr: false,
+  loading: () => (
+    <div aria-busy="true" aria-label="正在加载编辑器" className="editor-loading">
+      <div className="skeleton" style={{ width: "92%" }} />
+      <div className="skeleton" style={{ width: "78%" }} />
+      <div className="skeleton" style={{ width: "86%" }} />
+      <div className="skeleton" style={{ width: "40%" }} />
+    </div>
+  ),
 });
 const EDITOR_FLASH_KEY = "lilpolaris-editor-flash";
+const PANEL_PREFERENCE_KEY = "lilpolaris-editor-panel";
+const FOCUS_MODE_KEY = "lilpolaris-editor-focus";
 
 type SaveState =
   | "idle"
@@ -98,40 +137,93 @@ interface RecoveryPayload {
   pendingMedia?: PendingMedia[];
 }
 
-const SLASH_COMMANDS = [
-  { label: "大标题", detail: "# 标题", insert: "# 标题" },
-  { label: "二级标题", detail: "## 标题", insert: "## 标题" },
-  { label: "引用", detail: "> 引用内容", insert: "> 引用内容" },
-  { label: "待办事项", detail: "- [ ] 待办", insert: "- [ ] 待办" },
-  {
-    label: "代码块",
-    detail: "带语言的代码块",
-    insert: "```text\n代码\n```",
-  },
-  {
-    label: "表格",
-    detail: "两列表格",
-    insert: "| 列一 | 列二 |\n| --- | --- |\n| 内容 | 内容 |",
-  },
-  {
-    label: "Mermaid",
-    detail: "流程图",
-    insert: "```mermaid\ngraph LR\n  A --> B\n```",
-  },
-  { label: "公式", detail: "KaTeX 块公式", insert: "$$\nE = mc^2\n$$" },
+type FormatCommandId =
+  | "h1"
+  | "h2"
+  | "h3"
+  | "bold"
+  | "italic"
+  | "strike"
+  | "code"
+  | "quote"
+  | "bullet"
+  | "ordered"
+  | "task"
+  | "link"
+  | "table"
+  | "divider";
+
+const FORMAT_COMMANDS: Record<
+  FormatCommandId,
+  (state: EditorState) => TransactionSpec
+> = {
+  h1: (state) => toggleLinePrefix(state, "# "),
+  h2: (state) => toggleLinePrefix(state, "## "),
+  h3: (state) => toggleLinePrefix(state, "### "),
+  bold: (state) => toggleInlineMarker(state, "**"),
+  italic: (state) => toggleInlineMarker(state, "*"),
+  strike: (state) => toggleInlineMarker(state, "~~"),
+  code: (state) => toggleInlineMarker(state, "`", "代码"),
+  quote: (state) => toggleLinePrefix(state, "> "),
+  bullet: (state) => toggleLinePrefix(state, "- "),
+  ordered: (state) => toggleLinePrefix(state, "1. "),
+  task: (state) => toggleLinePrefix(state, "- [ ] "),
+  link: (state) => insertLink(state),
+  table: (state) =>
+    insertBlock(state, "| 列一 | 列二 |\n| --- | --- |\n| 内容 | 内容 |", 2),
+  divider: (state) => insertBlock(state, "---"),
+};
+
+type ToolbarItem =
+  | "|"
+  | {
+      id: FormatCommandId | "undo" | "redo";
+      label: string;
+      shortcut?: string;
+      icon: typeof Bold;
+    };
+
+const TOOLBAR_ITEMS: ToolbarItem[] = [
+  { id: "undo", label: "撤销", shortcut: "Ctrl+Z", icon: Undo2 },
+  { id: "redo", label: "重做", shortcut: "Ctrl+Y", icon: Redo2 },
+  "|",
+  { id: "h2", label: "二级标题", shortcut: "Ctrl+Alt+2", icon: Heading2 },
+  { id: "h3", label: "三级标题", shortcut: "Ctrl+Alt+3", icon: Heading3 },
+  { id: "bold", label: "加粗", shortcut: "Ctrl+B", icon: Bold },
+  { id: "italic", label: "斜体", shortcut: "Ctrl+I", icon: Italic },
+  { id: "strike", label: "删除线", shortcut: "Ctrl+Shift+X", icon: Strikethrough },
+  { id: "code", label: "行内代码", shortcut: "Ctrl+E", icon: Braces },
+  "|",
+  { id: "quote", label: "引用", icon: Quote },
+  { id: "bullet", label: "无序列表", icon: List },
+  { id: "ordered", label: "有序列表", icon: ListOrdered },
+  { id: "task", label: "待办列表", icon: ListChecks },
+  "|",
+  { id: "link", label: "链接", shortcut: "Ctrl+K", icon: LinkIcon },
+  { id: "table", label: "表格", icon: Table2 },
+  { id: "divider", label: "分割线", icon: Minus },
 ];
 
-function encodePath(path: string) {
-  const bytes = new TextEncoder().encode(path);
-  let binary = "";
-  bytes.forEach((value) => {
-    binary += String.fromCharCode(value);
-  });
-  return btoa(binary)
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/, "");
+function formatKey(id: FormatCommandId) {
+  return (view: EditorView) => {
+    view.dispatch(FORMAT_COMMANDS[id](view.state));
+    return true;
+  };
 }
+
+/** Markdown formatting shortcuts shared with the toolbar. */
+const FORMAT_KEYMAP = keymap.of([
+  { key: "Mod-b", run: formatKey("bold") },
+  { key: "Mod-i", run: formatKey("italic") },
+  { key: "Mod-e", run: formatKey("code") },
+  { key: "Mod-Shift-x", run: formatKey("strike") },
+  { key: "Mod-k", run: formatKey("link") },
+  { key: "Mod-Alt-1", run: formatKey("h1") },
+  { key: "Mod-Alt-2", run: formatKey("h2") },
+  { key: "Mod-Alt-3", run: formatKey("h3") },
+]);
+
+const encodePath = encodePostPathId;
 
 async function responseError(
   response: Response,
@@ -266,15 +358,29 @@ export function ArticleEditor({
   const [editorMode, setEditorMode] =
     useState<EditorMode>(defaultEditorMode);
   const [showProperties, setShowProperties] = useState(true);
-  const [slashQuery, setSlashQuery] = useState<string | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
+  const [slashMenu, setSlashMenu] = useState<{
+    commands: SlashCommand[];
+    index: number;
+    top: number;
+    left: number;
+  } | null>(null);
+  const [selectionLength, setSelectionLength] = useState(0);
+  const [recoveryOffer, setRecoveryOffer] = useState<RecoveryPayload>();
+  const [lastRemoteSaveAt, setLastRemoteSaveAt] = useState<number>();
+  const [clock, setClock] = useState(() => Date.now());
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const editorPaneRef = useRef<HTMLDivElement | null>(null);
+  const titleRef = useRef<HTMLTextAreaElement | null>(null);
+  const slashOpenRef = useRef(false);
   const [conflict, setConflict] = useState<{
     message: string;
     remoteSource?: string;
   }>();
   const editorView = useRef<EditorView | null>(null);
   const recoveryKey = useMemo(
-    () =>
-      `lilpolaris-recovery:${remote?.path || initial?.path || "new-article"}`,
+    () => recoveryKeyForPath(remote?.path || initial?.path),
     [initial?.path, remote?.path],
   );
   const recoveryKeyRef = useRef(recoveryKey);
@@ -322,7 +428,16 @@ export function ArticleEditor({
     const timer = window.setTimeout(() => {
       setMessage(flash);
       setSaveState("remote-saved");
+      setLastRemoteSaveAt(Date.now());
     }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  // The first save of a new article remounts the editor on its new URL;
+  // focus mode survives that and plain reloads within the tab.
+  useEffect(() => {
+    if (readBrowserValue("session", FOCUS_MODE_KEY) !== "on") return;
+    const timer = window.setTimeout(() => setFocusMode(true), 0);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -369,14 +484,62 @@ export function ArticleEditor({
       if (event.matches) setShowProperties(false);
     };
     media.addEventListener("change", closeOnMobile);
-    const timer = media.matches
-      ? window.setTimeout(() => setShowProperties(false), 0)
-      : undefined;
+    // Narrow desktop windows start with the panel closed so the text gets the
+    // room; an explicit choice is remembered across articles.
+    const remembered = readBrowserValue("local", PANEL_PREFERENCE_KEY);
+    const open = media.matches
+      ? false
+      : remembered === "open"
+        ? true
+        : remembered === "closed"
+          ? false
+          : window.matchMedia("(min-width: 1280px)").matches;
+    const timer = window.setTimeout(() => setShowProperties(open), 0);
     return () => {
-      if (timer !== undefined) window.clearTimeout(timer);
+      window.clearTimeout(timer);
       media.removeEventListener("change", closeOnMobile);
     };
   }, []);
+
+  const toggleProperties = useCallback((next?: boolean) => {
+    setShowProperties((current) => {
+      const value = next ?? !current;
+      if (!window.matchMedia("(max-width: 900px)").matches) {
+        writeBrowserValue("local", PANEL_PREFERENCE_KEY, value ? "open" : "closed");
+      }
+      return value;
+    });
+  }, []);
+
+  // Focus mode hides the admin chrome around the editor. It is a document
+  // level flag because the sidebar and top bar belong to the server layout.
+  useEffect(() => {
+    const root = document.documentElement;
+    writeBrowserValue("session", FOCUS_MODE_KEY, focusMode ? "on" : null);
+    if (focusMode) root.dataset.editorFocus = "true";
+    else delete root.dataset.editorFocus;
+    return () => {
+      delete root.dataset.editorFocus;
+    };
+  }, [focusMode]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const base = initial ? "编辑文章" : "新建文章";
+    const name = frontMatter.title.trim() || base;
+    document.title = `${dirty ? "● " : ""}${name} · LilPolaris Blog Admin`;
+  }, [dirty, frontMatter.title, initial]);
+
+  useEffect(() => {
+    const field = titleRef.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight}px`;
+  }, [frontMatter.title, focusMode, showProperties]);
 
   const changeEditorMode = useCallback((mode: EditorMode) => {
     setEditorMode(mode);
@@ -436,6 +599,35 @@ export function ArticleEditor({
     [operation, pendingMedia],
   );
 
+  const runToolbarCommand = useCallback(
+    (id: FormatCommandId | "undo" | "redo") => {
+      const view = editorView.current;
+      if (!view) return;
+      if (id === "undo") undo(view);
+      else if (id === "redo") redo(view);
+      else view.dispatch(FORMAT_COMMANDS[id](view.state));
+      view.focus();
+    },
+    [],
+  );
+
+  // Slash menu commands that need the page (file picker, media dialog).
+  useEffect(() => {
+    const pane = editorPaneRef.current;
+    if (!pane) return;
+    const onAction = (event: Event) => {
+      const action = (event as CustomEvent<SlashCommand["action"]>).detail;
+      if (action === "image") imageInputRef.current?.click();
+      else if (action === "media") mediaTriggerRef.current?.click();
+    };
+    pane.addEventListener(SLASH_ACTION_EVENT, onAction);
+    return () => pane.removeEventListener(SLASH_ACTION_EVENT, onAction);
+  }, []);
+
+  useEffect(() => {
+    slashOpenRef.current = Boolean(slashMenu);
+  }, [slashMenu]);
+
   const editorExtensions = useMemo(() => {
     const extensions = [
       markdown(),
@@ -450,6 +642,24 @@ export function ArticleEditor({
           if (imageFiles.length) {
             event.preventDefault();
             return queueImages(imageFiles, view);
+          }
+          const html = clipboard?.getData("text/html") || "";
+          // Rich text from web pages or Word becomes Markdown; Ctrl+Shift+V
+          // still pastes plain text because browsers then omit text/html.
+          if (html && shouldConvertPastedHtml(html, [...(clipboard?.types || [])])) {
+            const converted = pastedHtmlToMarkdown(html);
+            if (converted) {
+              event.preventDefault();
+              const isBlock =
+                converted.includes("\n") || /^(?:#{1,6} |[-*>] |\d+\. |\||```)/.test(converted);
+              view.dispatch(
+                isBlock
+                  ? insertBlock(view.state, converted)
+                  : view.state.replaceSelection(converted),
+                { scrollIntoView: true, userEvent: "input.paste" },
+              );
+              return true;
+            }
           }
           const text = clipboard?.getData("text/plain").trim() || "";
           const range = view.state.selection.main;
@@ -484,13 +694,41 @@ export function ArticleEditor({
           );
         },
       }),
+      ...slashCommandExtension(),
+      FORMAT_KEYMAP,
       CodeMirrorView.updateListener.of((update) => {
-        if (!update.docChanged && !update.selectionSet) return;
-        const head = update.state.selection.main.head;
-        const line = update.state.doc.lineAt(head);
-        const beforeCursor = update.state.sliceDoc(line.from, head);
-        const match = beforeCursor.match(/(?:^|\s)\/([^\s/]*)$/);
-        setSlashQuery(match ? match[1].toLowerCase() : null);
+        if (!update.docChanged && !update.selectionSet && !update.transactions.some((tr) => tr.effects.length)) {
+          return;
+        }
+        const selection = update.state.selection.main;
+        setSelectionLength(selection.to - selection.from);
+        const menu = slashMenuState(update.state);
+        if (!menu) {
+          setSlashMenu(null);
+          return;
+        }
+        update.view.requestMeasure({
+          read: (view) => {
+            const coords = view.coordsAtPos(menu.anchor);
+            const pane = view.dom.closest(".editor-pane");
+            if (!coords || !pane) return null;
+            const box = pane.getBoundingClientRect();
+            const below = coords.bottom - box.top + pane.scrollTop + 6;
+            return {
+              left: Math.min(
+                Math.max(12, coords.left - box.left - 12),
+                Math.max(12, box.width - 300),
+              ),
+              top:
+                box.bottom - coords.bottom < 300
+                  ? Math.max(8, coords.top - box.top + pane.scrollTop - 330)
+                  : below,
+            };
+          },
+          write: (position) => {
+            setSlashMenu(position ? { ...menu, ...position } : null);
+          },
+        });
       }),
       CodeMirrorView.theme({
         "&": {
@@ -500,9 +738,7 @@ export function ArticleEditor({
         },
         ".cm-content": {
           caretColor: "var(--foreground)",
-          margin: "0 auto",
-          maxWidth: "860px",
-          padding: "28px clamp(18px, 5vw, 68px) 160px",
+          padding: "4px 0 45vh",
           width: "100%",
         },
         ".cm-gutters": {
@@ -542,22 +778,8 @@ export function ArticleEditor({
           JSON.stringify(recoveredFrontMatter) !==
             JSON.stringify(initial?.frontMatter || defaults) ||
           Boolean(recovery.pendingMedia?.length);
-        if (
-          differs &&
-          window.confirm(
-            `发现 ${new Date(recovery.savedAt).toLocaleString("zh-CN")} 保存的本地恢复副本，是否恢复？`,
-          )
-        ) {
-          setBody(recovery.body);
-          setFrontMatter(recoveredFrontMatter);
-          setSlugEdited(Boolean(recoveredFrontMatter.slug));
-          const recoveredMedia = (recovery.pendingMedia || []).map((media) => ({
-              ...media,
-              previewUrl: URL.createObjectURL(media.blob),
-            }));
-          setPendingMedia(recoveredMedia);
-          setDirty(true);
-          setSaveState("local-saved");
+        if (differs && editRevisionRef.current === 0) {
+          setRecoveryOffer({ ...recovery, frontMatter: recoveredFrontMatter });
         }
       } catch {
         if (active) {
@@ -569,6 +791,29 @@ export function ArticleEditor({
       active = false;
     };
   }, [defaults, initial, recoveryKey]);
+
+  function acceptRecovery() {
+    const recovery = recoveryOffer;
+    if (!recovery) return;
+    setRecoveryOffer(undefined);
+    editRevisionRef.current += 1;
+    setBody(recovery.body);
+    setFrontMatter(recovery.frontMatter as EditableFrontMatter);
+    setSlugEdited(Boolean(recovery.frontMatter.slug));
+    const recoveredMedia = (recovery.pendingMedia || []).map((media) => ({
+      ...media,
+      previewUrl: URL.createObjectURL(media.blob),
+    }));
+    setPendingMedia(recoveredMedia);
+    setDirty(true);
+    setSaveState("local-saved");
+    setMessage("已恢复本机保存的版本，确认无误后记得保存到 GitHub。");
+  }
+
+  function discardRecovery() {
+    setRecoveryOffer(undefined);
+    void del(recoveryKey).catch(() => undefined);
+  }
 
   useEffect(() => {
     if (!dirty) return;
@@ -771,25 +1016,6 @@ export function ArticleEditor({
     setSaveState("local-saving");
   }
 
-  const insert = useCallback(
-    (prefix: string, suffix = "", fallback = "文本") => {
-      const view = editorView.current;
-      if (!view) return;
-      const range = view.state.selection.main;
-      const selected = view.state.sliceDoc(range.from, range.to) || fallback;
-      const value = `${prefix}${selected}${suffix}`;
-      view.dispatch({
-        changes: { from: range.from, to: range.to, insert: value },
-        selection: {
-          anchor: range.from + prefix.length,
-          head: range.from + prefix.length + selected.length,
-        },
-      });
-      view.focus();
-    },
-    [],
-  );
-
   const insertRaw = useCallback((value: string) => {
     const view = editorView.current;
     if (!view) return false;
@@ -831,6 +1057,8 @@ export function ArticleEditor({
     if (titleError || slugError) {
       setSaveState("error");
       setMessage(titleError || slugError);
+      if (titleError) titleRef.current?.focus();
+      else toggleProperties(true);
       return;
     }
     const normalizedSlug = frontMatter.slug.trim().replace(/\.md$/i, "");
@@ -939,6 +1167,7 @@ export function ArticleEditor({
         sha: result.sha,
         headSha: result.headSha,
       });
+      setLastRemoteSaveAt(Date.now());
       let successMessage: string;
       if (editedWhileSaving) {
         setBody((current) =>
@@ -1040,6 +1269,14 @@ export function ArticleEditor({
       ) {
         event.preventDefault();
         changeEditorMode(editorMode === "live" ? "source" : "live");
+      } else if (modifier && event.key === ".") {
+        event.preventDefault();
+        setFocusMode((value) => !value);
+      } else if (modifier && event.key === "\\") {
+        event.preventDefault();
+        toggleProperties();
+      } else if (event.key === "Escape" && focusMode && !slashOpenRef.current) {
+        setFocusMode(false);
       }
     };
     window.addEventListener("keydown", shortcuts);
@@ -1168,73 +1405,35 @@ export function ArticleEditor({
     setSaveState("local-saving");
   }
 
-  function toggleTag(tag: string) {
-    updateFrontMatter(
-      "tags",
-      frontMatter.tags.includes(tag)
-        ? frontMatter.tags.filter((item) => item !== tag)
-        : [...frontMatter.tags, tag],
-    );
-  }
-
-  function toggleCategory(path: string[]) {
-    const key = path.join(" > ");
-    const exists = frontMatter.categories.some(
-      (category) => category.join(" > ") === key,
-    );
-    updateFrontMatter(
-      "categories",
-      exists
-        ? frontMatter.categories.filter(
-            (category) => category.join(" > ") !== key,
-          )
-        : [...frontMatter.categories, path],
-    );
-  }
-
-  function runSlashCommand(command: (typeof SLASH_COMMANDS)[number]) {
-    const view = editorView.current;
-    if (!view) return;
-    const head = view.state.selection.main.head;
-    const line = view.state.doc.lineAt(head);
-    const before = view.state.sliceDoc(line.from, head);
-    const match = before.match(/\/[^\s/]*$/);
-    if (!match || match.index === undefined) return;
-    const from = line.from + match.index;
-    view.dispatch({
-      changes: { from, to: head, insert: command.insert },
-      selection: { anchor: from + command.insert.length },
-    });
-    setSlashQuery(null);
-    view.focus();
-  }
-
   const stats = useMemo(() => readingStats(body), [body]);
   const outline = useMemo(() => markdownOutline(body), [body]);
-  const filteredCommands =
-    slashQuery === null
-      ? []
-      : SLASH_COMMANDS.filter((command) =>
-          `${command.label} ${command.detail}`
-            .toLowerCase()
-            .includes(slashQuery),
-        );
+  const isBusy = operation !== null;
   const statusText =
     operation === "ai"
       ? "AI 正在生成文章属性…"
       : operation === "reload"
-      ? "正在加载远程版本…"
-      : operation === "delete"
-        ? "正在删除…"
-        : {
-            idle: dirty ? "存在未保存修改" : "未修改",
-            "local-saving": "正在保存本地副本…",
-            "local-saved": `已保存到本地${pendingMedia.length ? ` · ${pendingMedia.length} 张图片待提交` : ""}`,
-            "remote-saving": "正在原子提交…",
-            "remote-saved": "已保存到 GitHub",
-            error: "保存失败",
-          }[saveState];
-  const isBusy = operation !== null;
+        ? "正在加载远程版本…"
+        : operation === "delete"
+          ? "正在删除…"
+          : saveState === "remote-saving"
+            ? "正在提交到 GitHub…"
+            : saveState === "error"
+              ? "保存失败"
+              : dirty
+                ? saveState === "local-saved"
+                  ? `未提交 · 本机已暂存${pendingMedia.length ? ` · ${pendingMedia.length} 张图片待上传` : ""}`
+                  : "未提交 · 正在暂存…"
+                : lastRemoteSaveAt
+                  ? `已保存 · ${formatRelative(lastRemoteSaveAt, clock)}`
+                  : remote
+                    ? "与 GitHub 一致"
+                    : "新文章";
+  const statusTone =
+    saveState === "error"
+      ? "error"
+      : dirty || saveState === "remote-saving"
+        ? "pending"
+        : "saved";
   const publicUrl = `${publicBlogUrl}/posts/${frontMatter.slug || "…"}/`;
   const titleError = frontMatter.title.trim() ? "" : "文章标题不能为空。";
   const slugError = validateEditorSlug(
@@ -1242,147 +1441,124 @@ export function ArticleEditor({
     editorContext.occupiedSlugs,
     currentSlug,
   );
+  const isPublished = Boolean(remote && !frontMatter.draft);
+  const tagSuggestions: ChipSuggestion<string>[] = editorContext.tags.map(
+    (item) => ({
+      key: item.label,
+      label: item.label,
+      value: item.label,
+      count: item.count,
+    }),
+  );
+  const categorySuggestions: ChipSuggestion<CategoryPath>[] =
+    editorContext.categories.map((item) => {
+      const path = Array.isArray(item.value) ? item.value : [item.value];
+      return {
+        key: path.join(" > "),
+        label: path.join(" › "),
+        value: path,
+        count: item.count,
+      };
+    });
 
   return (
-    <div className="editor-shell">
+    <div className={`editor-shell${focusMode ? " focus" : ""}`}>
       <h1 className="sr-only">{initial ? "编辑文章" : "新建文章"}</h1>
       <header className="editor-header">
         <Link
           aria-label="返回文章列表"
           className="icon-button ghost"
           href={returnTo}
+          title="返回文章列表"
         >
           <ChevronLeft size={19} />
         </Link>
-        <div className="editor-identity">
-          <label>
-            <span>大标题</span>
-            <input
-              aria-label="文章标题"
-              aria-invalid={attemptedSave && Boolean(titleError)}
-              className="editor-title-input"
-              onChange={(event) => changeTitle(event.target.value)}
-              placeholder="输入文章标题"
-              value={frontMatter.title}
-            />
-            {attemptedSave && titleError ? (
-              <small className="rename-warning" role="alert">
-                {titleError}
-              </small>
-            ) : null}
-          </label>
-          <label>
-            <span>英文文件名</span>
-            <input
-              aria-label="英文文件名"
-              aria-invalid={Boolean(slugError) && (slugEdited || attemptedSave)}
-              className="editor-slug-input"
-              onChange={(event) => changeSlug(event.target.value)}
-              placeholder="english-file-name"
-              spellCheck={false}
-              value={frontMatter.slug}
-            />
-            {slugError && (slugEdited || attemptedSave) ? (
-              <small className="rename-warning" role="alert">
-                {slugError}
-              </small>
-            ) : (
-              <small title={publicUrl}>{publicUrl}</small>
-            )}
-            <div className="editor-slug-actions">
-              <button
-                className="preset-button"
-                disabled={isBusy || !frontMatter.title.trim()}
-                onClick={() => void suggestMetadata()}
-                title="根据中文标题、当前正文和历史已发布文章生成建议；必要时可创建新标签或分类"
-                type="button"
-              >
-                <WandSparkles size={13} />
-                {operation === "ai" ? "正在生成…" : "AI 智能生成"}
-              </button>
-              <button
-                className="preset-button"
-                onClick={regenerateSlug}
-                title="不调用模型，仅按标题中的英文字母生成文件名"
-                type="button"
-              >
-                本地规则生成
-              </button>
-            </div>
-          </label>
+        <div className="editor-crumb">
+          <span className={`badge ${isPublished ? "success" : "warning"}`}>
+            {isPublished ? "已发布" : remote ? "草稿" : "新草稿"}
+          </span>
+          <button
+            className="editor-crumb-slug"
+            onClick={() => toggleProperties(true)}
+            title="在文章属性中修改英文文件名"
+            type="button"
+          >
+            {frontMatter.slug || "未设置文件名"}.md
+          </button>
         </div>
         <span
           aria-live="polite"
-          className={`save-status ${saveState === "error" ? "error" : saveState === "remote-saved" ? "saved" : ""}`}
+          className={`save-status ${statusTone}`}
+          title={
+            lastRemoteSaveAt
+              ? `上次提交：${new Date(lastRemoteSaveAt).toLocaleString("zh-CN")}`
+              : undefined
+          }
         >
           <span className="status-dot" />
           {statusText}
         </span>
-        <button
-          aria-label={showProperties ? "收起文章属性" : "展开文章属性"}
-          className="icon-button"
-          onClick={() => setShowProperties((value) => !value)}
-          type="button"
-        >
-          {showProperties ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
-        </button>
-        {!remote || frontMatter.draft ? (
+        <div className="editor-header-actions">
           <button
-            className="button"
+            aria-label={focusMode ? "退出专注模式" : "专注模式"}
+            aria-pressed={focusMode}
+            className="icon-button ghost desktop-only"
+            onClick={() => setFocusMode((value) => !value)}
+            title={`${focusMode ? "退出专注模式" : "专注模式"}（Ctrl+.）`}
+            type="button"
+          >
+            {focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+          <button
+            aria-label={showProperties ? "收起文章属性" : "展开文章属性"}
+            aria-pressed={showProperties}
+            className="icon-button ghost"
+            onClick={() => toggleProperties()}
+            title={`${showProperties ? "收起" : "展开"}文章属性（Ctrl+\\）`}
+            type="button"
+          >
+            {showProperties ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
+          </button>
+          {!remote || frontMatter.draft ? (
+            <button
+              className="button"
+              disabled={isBusy}
+              onClick={() => save("draft")}
+              title="保存为草稿（Ctrl+S）"
+              type="button"
+            >
+              保存草稿
+            </button>
+          ) : null}
+          <button
+            className="button primary"
             disabled={isBusy}
-            onClick={() => save("draft")}
+            onClick={() => save("post")}
+            title={isPublished ? "更新已发布文章（Ctrl+S）" : "发布到博客（Ctrl+Enter）"}
             type="button"
           >
-            保存草稿
+            {isPublished ? "更新" : "发布"}
           </button>
-        ) : null}
-        <button
-          className="button primary"
-          disabled={isBusy}
-          onClick={() => save("post")}
-          type="button"
-        >
-          {remote && !frontMatter.draft ? "更新" : "发布"}
-        </button>
+        </div>
       </header>
-
-      <div className="preset-bar">
-        <span>快捷模板</span>
-        {editorContext.presets.map((preset) => (
-          <button
-            className="preset-button"
-            key={preset.id}
-            onClick={() => applyPreset(preset)}
-            title={`${preset.suggestedSlug} / ${preset.suggestedTitle}`}
-            type="button"
-          >
-            <WandSparkles size={13} />
-            {preset.label}
-            <small>{preset.suggestedTitle}</small>
-          </button>
-        ))}
-        {currentSlug && currentSlug !== frontMatter.slug ? (
-          <span className="rename-warning">
-            保存后将同步移动公开 URL 和文章资源目录
-          </span>
-        ) : null}
-      </div>
 
       <div className="editor-formatbar" role="toolbar" aria-label="Markdown 格式">
         <div className="view-tabs" aria-label="编辑器显示模式" role="group">
           <button
+            aria-pressed={editorMode === "live"}
             className={`button${editorMode === "live" ? " active" : ""}`}
             onClick={() => changeEditorMode("live")}
-            title="Ctrl+Shift+M"
+            title="实时预览（Ctrl+Shift+M 切换）"
             type="button"
           >
             <Eye size={14} />
-            Live Preview
+            预览
           </button>
           <button
+            aria-pressed={editorMode === "source"}
             className={`button${editorMode === "source" ? " active" : ""}`}
             onClick={() => changeEditorMode("source")}
-            title="Ctrl+Shift+M"
+            title="Markdown 源码（Ctrl+Shift+M 切换）"
             type="button"
           >
             <Code2 size={14} />
@@ -1390,40 +1566,24 @@ export function ArticleEditor({
           </button>
         </div>
         <span className="toolbar-divider" />
-        <button aria-label="撤销" className="format-button" onClick={() => editorView.current && undo(editorView.current)} type="button">
-          <Undo2 size={16} />
-        </button>
-        <button aria-label="重做" className="format-button" onClick={() => editorView.current && redo(editorView.current)} type="button">
-          <Redo2 size={16} />
-        </button>
-        <button aria-label="二级标题" className="format-button" onClick={() => insert("## ", "", "标题")} type="button">
-          <Heading2 size={16} />
-        </button>
-        <button aria-label="加粗" className="format-button" onClick={() => insert("**", "**")} type="button">
-          <Bold size={16} />
-        </button>
-        <button aria-label="斜体" className="format-button" onClick={() => insert("*", "*")} type="button">
-          <Italic size={16} />
-        </button>
-        <button aria-label="引用" className="format-button" onClick={() => insert("> ", "", "引用内容")} type="button">
-          <Quote size={16} />
-        </button>
-        <button aria-label="无序列表" className="format-button" onClick={() => insert("- ", "", "列表项")} type="button">
-          <List size={16} />
-        </button>
-        <button aria-label="有序列表" className="format-button" onClick={() => insert("1. ", "", "列表项")} type="button">
-          <ListOrdered size={16} />
-        </button>
-        <button aria-label="行内代码" className="format-button" onClick={() => insert("`", "`", "代码")} type="button">
-          <Braces size={16} />
-        </button>
-        <button aria-label="链接" className="format-button" onClick={() => insert("[", "](https://)", "链接文字")} type="button">
-          <LinkIcon size={16} />
-        </button>
-        <button aria-label="表格" className="format-button" onClick={() => insert("\n| 列一 | 列二 |\n| --- | --- |\n| ", " | 内容 |\n", "内容")} type="button">
-          <Table2 size={16} />
-        </button>
-        <label className="format-button" title="选择图片；也可以直接 Ctrl+V 或拖入">
+        {TOOLBAR_ITEMS.map((item, index) =>
+          item === "|" ? (
+            <span className="toolbar-divider" key={`divider-${index}`} />
+          ) : (
+            <button
+              aria-label={item.label}
+              className="format-button"
+              key={item.id}
+              onClick={() => runToolbarCommand(item.id)}
+              onMouseDown={(event) => event.preventDefault()}
+              title={item.shortcut ? `${item.label}（${item.shortcut}）` : item.label}
+              type="button"
+            >
+              <item.icon size={16} />
+            </button>
+          ),
+        )}
+        <label className="format-button" title="上传图片；也可以直接粘贴或拖入正文">
           <ImagePlus size={16} />
           <input
             accept=".jpg,.jpeg,.png,.gif,.webp,.avif"
@@ -1436,6 +1596,7 @@ export function ArticleEditor({
               }
               event.target.value = "";
             }}
+            ref={imageInputRef}
             type="file"
           />
         </label>
@@ -1452,6 +1613,7 @@ export function ArticleEditor({
             <button
               aria-label="从媒体库插入图片"
               className="format-button"
+              ref={mediaTriggerRef}
               title="从媒体库选择已有图片"
               type="button"
             >
@@ -1459,214 +1621,377 @@ export function ArticleEditor({
             </button>
           }
         />
-        <span className="editor-stats">
-          {stats.count} 字 · 约 {stats.minutes} 分钟 · Ctrl+S 保持当前状态保存 · Ctrl+Enter 发布
-        </span>
       </div>
 
       <div className="editor-workspace">
         <div
           aria-label="正文编辑区"
           className="editor-pane"
+          ref={editorPaneRef}
           role="region"
-          tabIndex={0}
         >
-          <CodeMirror
-            basicSetup={{
-              bracketMatching: true,
-              closeBrackets: true,
-              foldGutter: editorMode === "source",
-              highlightActiveLine: true,
-              highlightSelectionMatches: true,
-              history: true,
-              lineNumbers: editorMode === "source",
-            }}
-            extensions={editorExtensions}
-            height="100%"
-            onChange={changeBody}
-            onCreateEditor={(view) => {
-              editorView.current = view;
-              view.contentDOM.setAttribute(
-                "aria-label",
-                "Markdown 正文编辑器",
-              );
-            }}
-            placeholder={"开始写作…\n输入 / 可以打开快捷命令"}
-            value={body}
-          />
-          {filteredCommands.length ? (
-            <div className="slash-menu" role="group" aria-label="Markdown 快捷命令">
-              {filteredCommands.map((command) => (
-                <button key={command.label} onMouseDown={(event) => event.preventDefault()} onClick={() => runSlashCommand(command)} type="button">
+          <div className="editor-paper">
+            <textarea
+              aria-invalid={attemptedSave && Boolean(titleError)}
+              aria-label="文章标题"
+              autoFocus={!initial}
+              className="editor-title-field"
+              onChange={(event) => changeTitle(event.target.value.replace(/\n/g, ""))}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  const view = editorView.current;
+                  if (view) {
+                    view.dispatch({ selection: { anchor: 0 } });
+                    view.focus();
+                  }
+                }
+              }}
+              placeholder="无标题"
+              ref={titleRef}
+              rows={1}
+              value={frontMatter.title}
+            />
+            {attemptedSave && titleError ? (
+              <p className="editor-title-error" role="alert">
+                {titleError}
+              </p>
+            ) : null}
+            <CodeMirror
+              basicSetup={{
+                bracketMatching: true,
+                closeBrackets: true,
+                foldGutter: editorMode === "source",
+                highlightActiveLine: editorMode === "source",
+                highlightSelectionMatches: true,
+                history: true,
+                lineNumbers: editorMode === "source",
+              }}
+              extensions={editorExtensions}
+              onChange={changeBody}
+              onCreateEditor={(view) => {
+                editorView.current = view;
+                view.contentDOM.setAttribute(
+                  "aria-label",
+                  "Markdown 正文编辑器",
+                );
+              }}
+              placeholder={"开始写作…  输入 / 插入标题、列表、图片等"}
+              value={body}
+            />
+          </div>
+          {slashMenu ? (
+            <div
+              aria-label="Markdown 快捷命令"
+              className="slash-menu"
+              role="listbox"
+              style={{ left: slashMenu.left, top: slashMenu.top }}
+            >
+              {slashMenu.commands.map((command, index) => (
+                <button
+                  aria-selected={index === slashMenu.index}
+                  className={index === slashMenu.index ? "active" : undefined}
+                  key={command.label}
+                  onClick={() => {
+                    if (editorView.current) {
+                      applySlashCommand(editorView.current, command);
+                    }
+                  }}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => {
+                    if (editorView.current && index !== slashMenu.index) {
+                      selectSlashIndex(editorView.current, index);
+                    }
+                  }}
+                  role="option"
+                  type="button"
+                >
                   <strong>{command.label}</strong>
                   <span>{command.detail}</span>
                 </button>
               ))}
+              <div className="slash-hint">↑↓ 选择 · Enter 插入 · Esc 关闭</div>
             </div>
           ) : null}
         </div>
 
         {showProperties ? (
           <>
-          <button
-            aria-label="关闭文章属性"
-            className="property-backdrop"
-            onClick={() => setShowProperties(false)}
-            type="button"
-          />
-          <aside className="property-panel" aria-label="文章属性">
-            <div className="property-section">
-              <div className="property-heading">文章属性</div>
-              <label className="field">
-                <span className="field-label">首次上线时间（精确到秒）</span>
-                <input
-                  className="input"
-                  onChange={(event) => changeFirstPublishedAt(event.target.value)}
-                  pattern="\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"
-                  placeholder="首次发布自动写入；手动格式 YYYY-MM-DD HH:mm:ss"
-                  value={frontMatter.firstPublishedAt}
-                />
-              </label>
-              <label className="field">
-                <span className="field-label">标签</span>
-                <input
-                  className="input"
-                  onChange={(event) => updateFrontMatter("tags", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))}
-                  placeholder="Hexo, 写作, 教程"
-                  value={frontMatter.tags.join(", ")}
-                />
-              </label>
-              <div className="suggestion-row">
-                {editorContext.tags.slice(0, 10).map((item) => (
-                  <button className={frontMatter.tags.includes(item.label) ? "active" : ""} key={item.label} onClick={() => toggleTag(item.label)} type="button">
-                    {item.label}{item.count ? ` · ${item.count}` : ""}
+            <button
+              aria-label="关闭文章属性"
+              className="property-backdrop"
+              onClick={() => toggleProperties(false)}
+              type="button"
+            />
+            <aside className="property-panel" aria-label="文章属性">
+              <div className="property-section">
+                <div className="property-heading">发布设置</div>
+                <label className="field">
+                  <span className="field-label">英文文件名</span>
+                  <input
+                    aria-invalid={Boolean(slugError) && (slugEdited || attemptedSave)}
+                    className="input mono"
+                    onChange={(event) => changeSlug(event.target.value)}
+                    placeholder="english-file-name"
+                    spellCheck={false}
+                    value={frontMatter.slug}
+                  />
+                </label>
+                {slugError && (slugEdited || attemptedSave) ? (
+                  <p className="field-error" role="alert">
+                    {slugError}
+                  </p>
+                ) : (
+                  <p className="field-help url-preview" title={publicUrl}>
+                    {publicUrl}
+                  </p>
+                )}
+                {currentSlug && currentSlug !== frontMatter.slug ? (
+                  <p className="field-warning">
+                    保存后公开 URL 和文章资源目录会一起改名。
+                  </p>
+                ) : null}
+                <div className="button-row">
+                  <button
+                    className="preset-button"
+                    disabled={isBusy || !frontMatter.title.trim()}
+                    onClick={() => void suggestMetadata()}
+                    title="根据中文标题、当前正文和历史已发布文章生成文件名、标签和分类"
+                    type="button"
+                  >
+                    <WandSparkles size={13} />
+                    {operation === "ai" ? "正在生成…" : "AI 生成文件名和标签"}
                   </button>
-                ))}
+                  <button
+                    className="preset-button subtle"
+                    onClick={regenerateSlug}
+                    title="不调用模型，仅按标题中的英文字母生成文件名"
+                    type="button"
+                  >
+                    按标题生成
+                  </button>
+                </div>
+                <label className="field">
+                  <span className="field-label">首次上线时间</span>
+                  <input
+                    className="input"
+                    onChange={(event) => changeFirstPublishedAt(event.target.value)}
+                    pattern="\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"
+                    placeholder="首次发布时自动写入"
+                    value={frontMatter.firstPublishedAt}
+                  />
+                  <span className="field-help">格式 YYYY-MM-DD HH:mm:ss，留空则发布时自动填写。</span>
+                </label>
               </div>
-              <label className="field">
-                <span className="field-label">分类层级</span>
-                <textarea
-                  className="textarea"
-                  onChange={(event) => updateFrontMatter("categories", event.target.value.split(/\r?\n/).map((line) => line.split(">").map((item) => item.trim()).filter(Boolean)).filter((path) => path.length))}
-                  placeholder={"教程 > 分享\n随笔"}
-                  value={frontMatter.categories.map((path) => path.join(" > ")).join("\n")}
+
+              <div className="property-section">
+                <ChipInput
+                  label="标签"
+                  onChange={(tags) => updateFrontMatter("tags", tags)}
+                  parse={(text) => text.trim() || null}
+                  placeholder="输入后按 Enter 或逗号"
+                  suggestions={tagSuggestions}
+                  toKey={(tag) => tag}
+                  toLabel={(tag) => tag}
+                  values={frontMatter.tags}
                 />
-              </label>
-              <div className="suggestion-row">
-                {editorContext.categories.slice(0, 10).map((item) => {
-                  const path = Array.isArray(item.value) ? item.value : [item.value];
-                  const active = frontMatter.categories.some((category) => category.join(" > ") === path.join(" > "));
-                  return (
-                    <button className={active ? "active" : ""} key={item.label} onClick={() => toggleCategory(path)} type="button">
-                      {item.label}{item.count ? ` · ${item.count}` : ""}
-                    </button>
-                  );
-                })}
+                <ChipInput
+                  hint="多级分类用 > 分隔，例如：教程 > 分享"
+                  label="分类"
+                  onChange={(categories) => updateFrontMatter("categories", categories)}
+                  parse={(text) => {
+                    const path = text
+                      .split(/\s*[>＞›/]\s*/)
+                      .map((part) => part.trim())
+                      .filter(Boolean);
+                    return path.length ? path : null;
+                  }}
+                  placeholder="输入后按 Enter"
+                  quickPickCount={6}
+                  suggestions={categorySuggestions}
+                  toKey={(path) => path.join(" > ")}
+                  toLabel={(path) => path.join(" › ")}
+                  values={frontMatter.categories}
+                />
               </div>
-            </div>
 
-            <div className="property-section">
-              <label className="field">
-                <span className="field-label">摘要</span>
-                <textarea className="textarea" onChange={(event) => updateFrontMatter("excerpt", event.target.value)} value={frontMatter.excerpt} />
-              </label>
-              <label className="field">
-                <span className="field-label">封面</span>
-                <input className="input" onChange={(event) => updateFrontMatter("cover", event.target.value)} placeholder="/img/cover.jpg" value={frontMatter.cover} />
-              </label>
-              <label className="field">
-                <span className="field-label">布局</span>
-                <input className="input" onChange={(event) => updateFrontMatter("layout", event.target.value)} value={frontMatter.layout} />
-              </label>
-              <label className="field">
-                <span className="field-label">固定链接覆盖</span>
-                <input className="input" onChange={(event) => updateFrontMatter("permalink", event.target.value)} placeholder="posts/custom-url/" value={frontMatter.permalink} />
-              </label>
-            </div>
+              {editorContext.presets.length ? (
+                <div className="property-section">
+                  <div className="property-heading">快捷模板</div>
+                  <div className="preset-list">
+                    {editorContext.presets.map((preset) => (
+                      <button
+                        className="preset-button"
+                        key={preset.id}
+                        onClick={() => applyPreset(preset)}
+                        title={`${preset.suggestedSlug} / ${preset.suggestedTitle}`}
+                        type="button"
+                      >
+                        <WandSparkles size={13} />
+                        {preset.label}
+                        <small>{preset.suggestedTitle}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
-            {pendingMedia.length ? (
-              <div className="property-section">
-                <div className="property-heading">待提交图片说明</div>
-                {pendingMedia.map((media) => (
-                  <label className="field" key={media.id}>
-                    <span className="field-label" title={media.name}>
-                      {media.name}
-                    </span>
-                    <input
-                      aria-label={`${media.name} 的图片说明`}
-                      className="input"
-                      maxLength={300}
-                      onChange={(event) =>
-                        updatePendingMediaAlt(media.id, event.target.value)
-                      }
-                      placeholder="说明图片内容，便于无障碍阅读"
-                      value={media.alt}
-                    />
-                  </label>
-                ))}
-              </div>
-            ) : null}
+              {pendingMedia.length ? (
+                <div className="property-section">
+                  <div className="property-heading">待上传图片说明</div>
+                  {pendingMedia.map((media) => (
+                    <label className="field" key={media.id}>
+                      <span className="field-label" title={media.name}>
+                        {media.name}
+                      </span>
+                      <input
+                        aria-label={`${media.name} 的图片说明`}
+                        className="input"
+                        maxLength={300}
+                        onChange={(event) =>
+                          updatePendingMediaAlt(media.id, event.target.value)
+                        }
+                        placeholder="说明图片内容，便于无障碍阅读"
+                        value={media.alt}
+                      />
+                    </label>
+                  ))}
+                </div>
+              ) : null}
 
-            {outline.length ? (
-              <div className="property-section">
-                <div className="property-heading">文章目录</div>
-                <nav className="editor-outline">
-                  {outline.map((heading, index) => (
+              {outline.length ? (
+                <div className="property-section">
+                  <div className="property-heading">文章目录</div>
+                  <nav className="editor-outline">
+                    {outline.map((heading, index) => (
+                      <button
+                        key={`${heading.position}-${index}`}
+                        onClick={() => {
+                          editorView.current?.dispatch({
+                            selection: { anchor: heading.position },
+                            scrollIntoView: true,
+                          });
+                          editorView.current?.focus();
+                        }}
+                        style={{ paddingLeft: 8 + (heading.level - 1) * 13 }}
+                        type="button"
+                      >
+                        {heading.label}
+                      </button>
+                    ))}
+                  </nav>
+                </div>
+              ) : null}
+
+              <details className="property-section property-details">
+                <summary className="property-heading">摘要、封面与高级设置</summary>
+                <label className="field">
+                  <span className="field-label">摘要</span>
+                  <textarea className="textarea" onChange={(event) => updateFrontMatter("excerpt", event.target.value)} placeholder="留空时由主题自动截取" value={frontMatter.excerpt} />
+                </label>
+                <label className="field">
+                  <span className="field-label">封面</span>
+                  <input className="input" onChange={(event) => updateFrontMatter("cover", event.target.value)} placeholder="/img/cover.jpg" value={frontMatter.cover} />
+                </label>
+                <label className="field">
+                  <span className="field-label">布局</span>
+                  <input className="input" onChange={(event) => updateFrontMatter("layout", event.target.value)} value={frontMatter.layout} />
+                </label>
+                <label className="field">
+                  <span className="field-label">固定链接覆盖</span>
+                  <input className="input" onChange={(event) => updateFrontMatter("permalink", event.target.value)} placeholder="posts/custom-url/" value={frontMatter.permalink} />
+                </label>
+              </details>
+
+              {remote ? (
+                <div className="property-section">
+                  {isPublished ? (
+                    <a className="button" href={publicUrl} rel="noreferrer" target="_blank">
+                      <Eye size={15} />
+                      查看公开页面
+                    </a>
+                  ) : null}
+                  {isPublished ? (
                     <button
-                      key={`${heading.position}-${index}`}
-                      onClick={() => {
-                        editorView.current?.dispatch({
-                          selection: { anchor: heading.position },
-                          scrollIntoView: true,
-                        });
-                        editorView.current?.focus();
-                      }}
-                      style={{ paddingLeft: 8 + (heading.level - 1) * 13 }}
+                      className="button danger"
+                      disabled={isBusy}
+                      onClick={moveToDraft}
                       type="button"
                     >
-                      {heading.label}
+                      <FileClock size={15} />
+                      取消发布并移入草稿
                     </button>
-                  ))}
-                </nav>
-              </div>
-            ) : null}
-
-            <div className="property-section">
-              {remote && !frontMatter.draft ? (
-                <a className="button" href={publicUrl} rel="noreferrer" target="_blank">
-                  <Eye size={15} />
-                  查看公开页面
-                </a>
+                  ) : null}
+                  <button
+                    className="button danger"
+                    disabled={isBusy}
+                    onClick={deleteArticle}
+                    type="button"
+                  >
+                    <Trash2 size={15} />
+                    删除文章
+                  </button>
+                </div>
               ) : null}
-              {remote && !frontMatter.draft ? (
-                <button
-                  className="button danger"
-                  disabled={isBusy}
-                  onClick={moveToDraft}
-                  type="button"
-                >
-                  <FileClock size={15} />
-                  取消发布并移入草稿
-                </button>
-              ) : null}
-              {remote ? (
-                <button
-                  className="button danger"
-                  disabled={isBusy}
-                  onClick={deleteArticle}
-                  type="button"
-                >
-                  <Trash2 size={15} />
-                  删除文章
-                </button>
-              ) : null}
-            </div>
-          </aside>
+            </aside>
           </>
         ) : null}
       </div>
 
-      {message ? <div aria-live="polite" className="toast">{message}</div> : null}
+      <footer className="editor-statusbar">
+        <span>
+          {stats.count} 字 · 约 {stats.minutes} 分钟
+          {selectionLength ? ` · 已选 ${selectionLength} 字符` : ""}
+        </span>
+        <span className="editor-shortcuts">
+          / 插入 · Ctrl+S 保存 · Ctrl+Enter 发布 · Ctrl+. 专注
+        </span>
+      </footer>
+
+      <Toast message={message} onDismiss={() => setMessage("")} />
+
+      {recoveryOffer ? (
+        <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
+          <section className="panel dialog-card recovery-dialog">
+            <div className="panel-header">
+              <h2 className="panel-title" id="recovery-title">发现本机未提交的版本</h2>
+            </div>
+            <div className="panel-body">
+              <p style={{ marginTop: 0 }}>
+                {formatRelative(recoveryOffer.savedAt, clock)}（
+                {new Date(recoveryOffer.savedAt).toLocaleString("zh-CN")}）在这台设备上自动暂存过这篇文章，
+                内容和 GitHub 上的版本不同。
+              </p>
+              <dl className="recovery-summary">
+                <div>
+                  <dt>标题</dt>
+                  <dd>{recoveryOffer.frontMatter.title || "未命名"}</dd>
+                </div>
+                <div>
+                  <dt>正文</dt>
+                  <dd>
+                    {readingStats(recoveryOffer.body).count} 字（当前 {stats.count} 字）
+                  </dd>
+                </div>
+                {recoveryOffer.pendingMedia?.length ? (
+                  <div>
+                    <dt>图片</dt>
+                    <dd>{recoveryOffer.pendingMedia.length} 张尚未上传</dd>
+                  </div>
+                ) : null}
+              </dl>
+              <div className="button-group dialog-actions">
+                <button className="button danger" onClick={discardRecovery} type="button">
+                  丢弃本机版本
+                </button>
+                <button className="button primary" onClick={acceptRecovery} type="button">
+                  恢复本机版本
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {conflict ? (
         <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="conflict-title">
