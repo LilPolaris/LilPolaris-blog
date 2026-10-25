@@ -184,7 +184,7 @@ try {
   );
   await editor.press("Control+s");
   assert.equal((await saveResponse).status(), 200);
-  await page.getByText("已保存到 GitHub", { exact: true }).waitFor();
+  await page.locator(".save-status.saved").getByText(/已保存/).waitFor();
   const saved = (
     await (
       await context.request.get(`${baseUrl}/api/posts/${copied.id}`)

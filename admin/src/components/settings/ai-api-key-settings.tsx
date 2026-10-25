@@ -80,15 +80,19 @@ export function AiApiKeySettings({
         </span>
       </div>
       <div className="panel-body">
-        <div className="alert" style={{ marginBottom: 20 }}>
-          <ShieldCheck size={18} />
-          <div>
-            当前使用 <strong>{status.model}</strong>。Key 会先做真实连接测试，再由
-            AUTH_SECRET 加密并写入 HttpOnly Cookie；不会进入 Local Storage、普通设置或仓库。
-            点击生成时会发送当前文章的标题、截断正文/摘要和历史已发布文章元数据，
-            不会发送其他草稿。
-          </div>
-        </div>
+        <details className="notice">
+          <summary>
+            <ShieldCheck aria-hidden="true" size={15} />
+            <span>
+              当前模型 <strong>{status.model}</strong> · Key 加密保存在 Cookie 中
+            </span>
+          </summary>
+          <p>
+            Key 会先做真实连接测试，再由 AUTH_SECRET 加密并写入 HttpOnly Cookie；
+            不会进入 Local Storage、普通设置或仓库。点击生成时会发送当前文章的标题、
+            截断正文/摘要和历史已发布文章元数据，不会发送其他草稿。
+          </p>
+        </details>
         {status.browserKeySupported ? (
           <>
             <div className="form-grid">

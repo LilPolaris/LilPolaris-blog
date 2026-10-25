@@ -50,10 +50,10 @@ try {
   checks.push("Dashboard and both theme toggles work with localStorage/sessionStorage blocked");
   await page.goto(`${baseUrl}/posts/new`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "源码", exact: true }).click();
-  await page.getByRole("button", { name: "Live Preview", exact: true }).click();
+  await page.getByRole("button", { name: "预览", exact: true }).click();
   const slug = `resilience-storage-${Date.now()}`;
   await page.getByLabel("文章标题", { exact: true }).fill("Storage resilience browser test");
-  await page.locator(".editor-slug-input").fill(slug);
+  await page.getByLabel("英文文件名", { exact: true }).fill(slug);
   const content = "# Storage resilience\n\n本地存储不可用时，仍可保存远程草稿。";
   await page.locator(".cm-content").fill(content);
   await page.getByText("本地恢复副本保存失败，请尽快重试远程保存。", { exact: true }).waitFor();

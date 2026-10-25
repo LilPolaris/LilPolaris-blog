@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { encode } from "next-auth/jwt";
 import { chromium } from "playwright-core";
 
 const baseUrl = process.env.ADMIN_SMOKE_URL || "http://127.0.0.1:3199";
@@ -17,6 +18,23 @@ const browser = await chromium.launch({
 
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  // A test session for the Mock server, as in smoke-quality; without a
+  // secret the script falls back to the launcher's local-cli sign-in.
+  if (process.env.ADMIN_SMOKE_AUTH_SECRET) {
+    await page.context().addCookies([
+      {
+        name: "authjs.session-token",
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax",
+        value: await encode({
+          secret: process.env.ADMIN_SMOKE_AUTH_SECRET,
+          salt: "authjs.session-token",
+          token: { sub: "smoke-test", login: "LilPolaris", name: "本地验证" },
+        }),
+      },
+    ]);
+  }
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   const localLogin = page.getByRole("button", {
     name: /使用本机 GitHub 身份进入/,
@@ -44,7 +62,7 @@ try {
     throw new Error("Switching to source mode changed the Markdown document.");
   }
 
-  await page.getByRole("button", { name: "Live Preview", exact: true }).click();
+  await page.getByRole("button", { name: "预览", exact: true }).click();
   await page
     .locator(".preset-button")
     .filter({ hasText: "随笔" })
@@ -84,7 +102,7 @@ try {
   if (!sourceAfterPaste.includes("asset_img")) {
     throw new Error("Pasted image was not inserted into Markdown.");
   }
-  await page.getByRole("button", { name: "Live Preview", exact: true }).click();
+  await page.getByRole("button", { name: "预览", exact: true }).click();
   await page.locator(".cm-live-block-preview img").waitFor();
   const previewLoaded = await page
     .locator(".cm-live-block-preview img")

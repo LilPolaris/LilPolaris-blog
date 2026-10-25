@@ -31,7 +31,10 @@ export function LocalRecoveryList() {
 
   useEffect(() => {
     let active = true;
-    void entries()
+    // idb-keyval throws synchronously when storage is blocked by policy, so
+    // start inside a promise chain to keep that out of React's render path.
+    void Promise.resolve()
+      .then(() => entries())
       .then((rows) => {
         if (!active) return;
         const found = rows.flatMap(([key, value]) => {

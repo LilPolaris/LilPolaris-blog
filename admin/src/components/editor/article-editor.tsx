@@ -422,10 +422,12 @@ export function ArticleEditor({
   }, []);
 
   useEffect(() => {
-    const flash = readBrowserValue("session", EDITOR_FLASH_KEY);
-    if (!flash) return;
-    writeBrowserValue("session", EDITOR_FLASH_KEY, null);
+    // Consume the one-time message inside the timer: an effect that is set up
+    // twice (React Strict Mode) must not clear it before it is shown.
     const timer = window.setTimeout(() => {
+      const flash = readBrowserValue("session", EDITOR_FLASH_KEY);
+      if (!flash) return;
+      writeBrowserValue("session", EDITOR_FLASH_KEY, null);
       setMessage(flash);
       setSaveState("remote-saved");
       setLastRemoteSaveAt(Date.now());

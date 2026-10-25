@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { encode } from "next-auth/jwt";
 import { chromium } from "playwright-core";
 
 const baseUrl = process.env.ADMIN_SMOKE_URL || "http://127.0.0.1:3201";
@@ -21,6 +22,23 @@ const browser = await chromium.launch({ executablePath: edge, headless: true });
 
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  // A test session for the Mock server, as in smoke-quality; without a
+  // secret the script falls back to the launcher's local-cli sign-in.
+  if (process.env.ADMIN_SMOKE_AUTH_SECRET) {
+    await page.context().addCookies([
+      {
+        name: "authjs.session-token",
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax",
+        value: await encode({
+          secret: process.env.ADMIN_SMOKE_AUTH_SECRET,
+          salt: "authjs.session-token",
+          token: { sub: "smoke-test", login: "LilPolaris", name: "本地验证" },
+        }),
+      },
+    ]);
+  }
   const apiResponses = [];
   const mediaResponses = [];
   const apiRequestSizes = [];
@@ -222,8 +240,9 @@ try {
     !result.draftVisible ||
     !result.mediaVisible ||
     result.mediaResponses.some((item) => item.status >= 400) ||
-    result.previewSize.width !== 1400 ||
-    result.previewSize.height !== 1100
+    // The editor preview requests a 1200px rendition of the 1400x1100 source.
+    result.previewSize.width !== 1200 ||
+    Math.abs(result.previewSize.height - Math.round((1200 * 1100) / 1400)) > 1
   ) {
     throw new Error(`Upload smoke failed: ${JSON.stringify(result)}`);
   }

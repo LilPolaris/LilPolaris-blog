@@ -267,22 +267,27 @@ export function SettingsForm({
           </span>
         </div>
         <div className="panel-body">
-          <div className="alert" style={{ marginBottom: 20 }}>
-            <ShieldCheck size={18} />
-            <div>
+          <details className="notice">
+            <summary>
+              <ShieldCheck aria-hidden="true" size={15} />
+              这里的设置只对当前浏览器生效
+            </summary>
+            <p>
               Token、OAuth Secret 和 AUTH_SECRET 只能通过服务端环境变量配置，
               不会显示或写入浏览器存储。下面的非敏感设置保存在签名 HttpOnly
-              Cookie 中，仅对当前浏览器生效；换设备或清理 Cookie 后会恢复环境变量默认值。
-            </div>
-          </div>
+              Cookie 中；换设备或清理 Cookie 后会恢复环境变量默认值。
+            </p>
+          </details>
           {repositoryScopeLocked ? (
-            <div className="alert" style={{ marginBottom: 20 }}>
-              <ShieldCheck size={18} />
-              <div>
-                GitHub 仓库、分支和三条内容路径由服务端环境变量锁定。
+            <details className="notice">
+              <summary>
+                <ShieldCheck aria-hidden="true" size={15} />
+                仓库、分支和内容路径由部署环境锁定
+              </summary>
+              <p>
                 这可防止浏览器设置借用服务器 Token 访问其他仓库；如需变更，请更新部署环境后重启。
-              </div>
-            </div>
+              </p>
+            </details>
           ) : null}
           {validationErrors.length ? (
             <div aria-live="polite" className="alert danger" style={{ marginBottom: 20 }}>

@@ -841,6 +841,43 @@ a {
   padding: 12px 14px;
 }
 
+.notice {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  margin-bottom: 18px;
+  padding: 9px 12px;
+}
+
+.notice > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  list-style: none;
+}
+
+.notice > summary::-webkit-details-marker {
+  display: none;
+}
+
+.notice > summary::after {
+  content: "详情";
+  font-size: 12px;
+  margin-left: auto;
+  opacity: 0.8;
+}
+
+.notice[open] > summary::after {
+  content: "收起";
+}
+
+.notice > p {
+  margin: 8px 0 2px 23px;
+}
+
 .alert.danger {
   background: color-mix(in srgb, var(--destructive) 8%, var(--surface));
   border-color: color-mix(in srgb, var(--destructive) 28%, var(--border));
